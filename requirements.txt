@@ -1,26 +1,13 @@
-# Conformal Prediction for Implied Volatility - Dependencies
-
-# Core deep learning
 torch>=2.0.0
 torch-geometric>=2.3.0
 tensordict>=0.6.0
-
-# Scientific computing
 numpy>=1.24.0
 scipy>=1.10.0
 pandas>=2.0.0
-
-# Options pricing
 py-vollib-vectorized>=0.1.1
-
-# Visualization
 matplotlib>=3.7.0
 seaborn>=0.12.0
-
-# Notebook
 jupyter>=1.0.0
 ipykernel>=6.25.0
-
-# Optional but recommended
 tqdm>=4.65.0
 plotly==6.7.0
