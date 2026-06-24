@@ -1,12 +1,3 @@
-"""
-Conformal prediction for implied volatility surfaces.
-
-Components:
-- nonconformity_scores: Score computation (spread and Vega normalized)
-- rolling_window: Temporal calibration window
-- prediction_bands: Uncertainty band construction
-"""
-
 from .nonconformity_scores import (
     NonconformityScore,
     SpreadNormalizedScore,
@@ -14,27 +5,26 @@ from .nonconformity_scores import (
     compute_scores_from_data
 )
 
-
 from .rolling_window import RollingWindowCalibration, CalibrationSurface
 
-
+from .no_arbitrage_projection import (
+    ArbitrageConstraints,
+    check_butterfly_arbitrage,
+    check_calendar_arbitrage,
+    project_to_arbitrage_free
+)
 
 __all__ = [
-    # Nonconformity scores
     'NonconformityScore',
     'SpreadNormalizedScore',
     'VegaNormalizedScore',
     'compute_scores_from_data',
-
-    
-
-    # Rolling window
     'RollingWindowCalibration',
     'CalibrationSurface',
-
-    # Prediction bands
-    'PredictionBands',
-
+    'ArbitrageConstraints',
+    'check_butterfly_arbitrage',
+    'check_calendar_arbitrage',
+    'project_to_arbitrage_free',
 ]
 
 __version__ = "0.1.0"
