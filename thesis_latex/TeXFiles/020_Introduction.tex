@@ -1,0 +1,84 @@
+\chapter{Introduction}
+\label{chap:introduction}
+
+Continued growth in options trading has increased the practical importance of reliable methods for derivative pricing and risk management. Cboe Global Markets reported record trading volumes in 2025, with 4.6 billion contracts traded across its four options exchanges, marking the sixth consecutive annual record. S\&P 500 Index (SPX) options accounted for 970.6 million contracts and an average daily volume of 3.9 million contracts \cite{cboe2025report}. This level of activity strengthens the need for efficient methods that construct implied volatility (IV) surfaces from complex and irregular market data.
+
+Implied volatility converts a quoted option price into the volatility parameter that reproduces the price within the Black--Scholes model. The implied volatility surface collects these values across strikes and maturities at a given time and serves as an important input for derivative pricing, hedging, and risk management. Constructing a smooth and financially consistent surface from the discrete and noisy quotes available in practice is a central challenge in quantitative finance \cite{gonon2024operator}.
+
+Parametric methods address this problem by fitting a functional form to each new set of market quotes. The widely used Stochastic Volatility Inspired (SVI) model \cite{gatheral2014ssvi}, for example, parameterises each maturity slice using a five-parameter form. Such calibration approaches generally require numerical optimisation for each market snapshot and may be sensitive to the selected initial values \cite{gonon2024operator}.
+
+Recent advances in machine learning have opened new possibilities for volatility surface construction. Gonon, Jacquier, and Wiedemann \cite{gonon2024operator} propose an Operator Deep Smoothing approach based on a Graph Neural Operator (GNO). The model accepts market quotes at the strike--maturity locations available in a given snapshot and produces a smooth implied volatility surface in a single forward pass. Its training objective encourages adherence to the relevant financial constraints. Because the architecture can process changing input configurations, it does not require a separate numerical calibration for every market snapshot or an initial interpolation of the quotes onto a fixed grid.
+
+The GNO produces a deterministic smoothed surface but does not by itself provide prediction intervals around that surface. An uncertainty layer can therefore complement the point prediction by showing how closely the observed implied volatilities are expected to lie around the fitted surface. This is particularly useful when the density and quality of the available quotes vary across the surface or over time.
+
+Common uncertainty quantification approaches add computational requirements to the underlying model. Monte Carlo dropout uses repeated stochastic forward passes as an approximation to Bayesian inference \cite{gal2016dropout}, while deep ensembles require multiple models to be trained and evaluated \cite{lakshminarayanan2017simple}. Conformal prediction instead post-processes the output of a fixed predictor. Under exchangeability of the calibration and test observations, standard conformal methods provide a finite-sample marginal coverage guarantee without requiring a parametric model for the prediction errors \cite{shafer2008tutorial, angelopoulos2023gentle}. This makes conformal prediction a suitable uncertainty layer around the pre-trained GNO. Since the empirical application in this thesis is temporally ordered, the rolling implementation and its achieved coverage are evaluated directly rather than treating exchangeability as exact.
+
+A key challenge in applying conformal prediction to implied volatility surfaces is the design of suitable nonconformity scores. An unscaled residual treats errors of the same numerical size equally across the surface, although quote spreads and option sensitivities vary with strike and maturity. This thesis therefore studies two economically motivated scores based on bid--ask spreads and option Vega. These quantities scale the residuals using information available for each option and allow the resulting band widths to vary across the surface.
+
+\section{Motivation and Problem Statement}
+\label{sec:motivation}
+
+The central problem addressed in this thesis is the construction of calibrated uncertainty bands for implied volatility surfaces produced by the Graph Neural Operator approach. More specifically, this work develops an efficient uncertainty quantification layer that:
+
+\begin{enumerate}
+    \item Targets finite-sample marginal coverage across observed surface points under exchangeability, without requiring a parametric model for the prediction errors;
+    \item Accounts for heteroskedastic prediction errors through economically motivated normalization;
+    \item Responds to changing market conditions through rolling calibration windows;
+    \item Produces uncertainty bands in both implied volatility and price spaces; and
+    \item Applies a post-processing routine that enforces calendar and butterfly conditions on the lower and upper band surfaces on a regular grid.
+\end{enumerate}
+
+Options data are heterogeneous across both time and the strike--expiry domain. Liquidity, quote density, bid--ask spreads, and price sensitivity vary between regions of the surface. The proposed framework therefore allows the band width to vary across observed points and evaluates whether spatially adaptive calibration improves coverage across the surface while retaining marginal evaluation over all observations.
+
+\section{Research Objectives}
+\label{sec:objectives}
+
+This thesis pursues the following specific objectives:
+
+\begin{enumerate}
+    \item \textbf{Design economically motivated nonconformity scores:} Develop two heteroskedastic scoring mechanisms that normalize prediction errors by (a) bid-ask spreads in price space and (b) Vega-weighted sensitivity in implied volatility space, ensuring uncertainty bands align with trading frictions and option Greeks.
+
+    \item \textbf{Implement rolling window calibration:} Establish a temporal adaptation mechanism using a sliding window of recent market snapshots to compute conformal quantiles, enabling the framework to track regime changes in market volatility dynamics.
+
+    \item \textbf{Evaluate spatial heterogeneity via Mondrian conformal prediction:} Investigate whether partitioning the strike-expiry domain into spatial bins and computing region-specific quantiles improves coverage uniformity across areas with varying liquidity.
+
+    \item \textbf{Construct prediction bands in dual spaces:} Provide practitioners with uncertainty estimates in both implied volatility space (for volatility trading) and price space (for delta hedging and risk management).
+
+    \item \textbf{Apply calendar and butterfly adjustments to prediction bands:} Apply an iterative projection algorithm to the lower and upper band surfaces and evaluate the resulting calendar and butterfly conditions on the finite $(\rho,z)$ grid used by the implementation.
+
+    \item \textbf{Validate empirical coverage:} Assess whether the conformal band surfaces achieve the nominal marginal coverage probability $(1 - \alpha)$ across observed quote locations in S\&P 500 options data spanning December 2025 to August 2026.
+\end{enumerate}
+
+\section{Contributions}
+\label{sec:contributions}
+
+The main contributions of this thesis are:
+
+\begin{enumerate}
+    \item \textbf{First application of conformal prediction to neural operator-based volatility surfaces:} While conformal prediction has been applied to operator learning in scientific computing \cite{ma2024calibrated}, and to implied volatility forecasting without neural operators \cite{canete2023market}, to the best of our knowledge this work represents the first integration of distribution-free uncertainty quantification with operator learning architectures specifically in the context of implied volatility smoothing.
+
+    \item \textbf{Economically aligned nonconformity scores:} Adaptation of spread-normalized price errors and Vega-normalized implied volatility errors for conformal calibration around the GNO surface. These constructions incorporate bid-ask spread information and option sensitivity when determining the band widths.
+
+    \item \textbf{Temporal adaptation via rolling calibration:} Use of a rolling window of recent calibration data so that the conformal quantiles respond to changes in the observed prediction errors. Its performance on the temporally ordered surfaces is assessed empirically through the walk-forward evaluation.
+
+    \item \textbf{Grid-based projection of uncertainty bands:} Implementation of an iterative procedure that applies the discrete calendar and butterfly adjustments used in this thesis to both the lower and upper band surfaces, together with diagnostics for residual violations and lower-upper crossings.
+
+    \item \textbf{Empirical validation on real market data:} Comprehensive evaluation on S\&P 500 options data spanning December 2025 to August 2026, providing evidence that conformal prediction can deliver empirically calibrated uncertainty surfaces in a challenging real-world financial application.
+\end{enumerate}
+
+\section{Thesis Outline}
+\label{sec:outline}
+
+The remainder of this thesis is structured as follows:
+
+\textbf{Chapter 2: Background and Related Work} provides the necessary background on implied volatility surfaces, no-arbitrage constraints, traditional smoothing methods, neural operators, and the theoretical foundations of conformal prediction. We review related work on uncertainty quantification in financial machine learning and position our contribution within this literature.
+
+\textbf{Chapter 3: Methodology} presents the technical details of our conformal uncertainty quantification framework. We formally define the problem, introduce the two nonconformity scores (spread-normalized and Vega-normalized), describe the rolling window calibration mechanism, explain Mondrian conformal prediction for spatial heterogeneity, detail the construction of prediction bands in both price and implied volatility spaces, and present the grid-based projection procedure used to apply calendar and butterfly adjustments to the resulting band surfaces.
+
+\textbf{Chapter 4: Implementation} describes the software architecture, data preprocessing pipeline, and integration with the pre-trained GNO model from Gonon et al.
+
+\textbf{Chapter 5: Experiments and Results} reports the empirical evaluation on S\&P 500 options data. We present coverage and sharpness results, visualizations of the uncertainty bands, the comparison of Score A and Score B, the comparison of global and Mondrian calibration, and the projection diagnostics.
+
+\textbf{Chapter 6: Discussion} interprets the results, examines the practical implications for risk management and trading, discusses the limitations of the approach (particularly regarding the exchangeability assumption), and considers the financial validity of the uncertainty bands.
+
+\textbf{Chapter 7: Conclusion} summarizes the contributions, reflects on the broader significance of distribution-free uncertainty quantification for financial machine learning, and outlines directions for future work, including extensions to online conformal prediction, adaptive spatial binning, and integration with richer option pricing models.

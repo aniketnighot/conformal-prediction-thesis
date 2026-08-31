@@ -1,0 +1,162 @@
+% Chapter 2: Background and Related Work
+
+\chapter{Background and Related Work}
+\label{chap:literature}
+
+This chapter establishes the technical foundations on which the thesis builds. We begin by introducing the financial setting of implied volatility surfaces and the no-arbitrage conditions they must satisfy. We then survey classical and machine learning-based approaches to implied volatility smoothing, situating the Graph Neural Operator method of Gonon, Jacquier, and Wiedemann \cite{gonon2024operator} within this landscape. Finally, we review the theoretical framework of conformal prediction and discuss related work on uncertainty quantification in financial machine learning.
+
+\section{Implied Volatility and the Options Market}
+\label{sec:iv_background}
+
+\subsection{European Options and the Black-Scholes Model}
+\label{subsec:bs}
+
+Following the notation of Gonon et al.\ \cite{gonon2024operator}, we consider a market of European options written on an underlying asset observed at a reference time $T_0$. Each option is identified by its expiry $T \in (T_0, \infty)$ and its strike $K \in (0, \infty)$. The time-to-expiry is denoted $\tau = T - T_0$ and the log-moneyness is defined as $k = \log(K / F_{T_0, T})$, where $F_{T_0, T}$ denotes the time-$T$ forward price of the underlying asset.
+
+The Black--Scholes model \cite{blackscholes1973} provides a closed-form expression for the forward-normalised price of a European call option with time-to-expiry $\tau$ and log-moneyness $k$, as a function of the volatility parameter $v \in (0, \infty)$:
+\begin{equation}
+    \text{BS}(\tau, k, v) = \Phi(d_1(\tau, k, v)) - e^k \Phi(d_2(\tau, k, v)),
+\end{equation}
+where $\Phi$ denotes the cumulative distribution function of the standard normal distribution and
+\begin{equation}
+    d_1(\tau,k,v) = \frac{-k}{v\sqrt{\tau}} + \frac{1}{2}v\sqrt{\tau},
+    \qquad
+    d_2(\tau,k,v) = \frac{-k}{v\sqrt{\tau}} - \frac{1}{2}v\sqrt{\tau}.
+\end{equation}
+The sensitivity of this forward-normalised option price with respect to the volatility parameter, known as Vega, plays a central role in this thesis and is given by:
+\begin{equation}
+    \mathcal{V}(\tau, k, v) = \varphi(d_1(\tau, k, v))\sqrt{\tau},
+\end{equation}
+where $\varphi$ denotes the standard normal density \cite{blackscholes1973}.
+
+\subsection{Implied Volatility}
+\label{subsec:iv}
+
+While the Black--Scholes model does not fully describe observed market dynamics, its mathematical tractability makes it a widely used quoting convention. Let $C(T,K)$ denote the undiscounted market price of a call option. Its implied volatility $v(\tau,k)$ is defined as the volatility value that satisfies
+\begin{equation}
+    C(T, K) = F_{T_0, T} \cdot \text{BS}(\tau, k, v(\tau, k)).
+\end{equation}
+Implied volatility therefore expresses an observed option price as a market-implied Black--Scholes volatility parameter. This provides a common quoting scale for comparing the relative expensiveness of options across strikes, maturities, underlyings, and interest-rate environments \cite{gonon2024operator}.
+
+\subsection{The Implied Volatility Surface}
+\label{subsec:iv_surface}
+
+At any given instant, an options market offers contracts across a range of strikes and maturities. Inverting the Black--Scholes formula \cite{blackscholes1973} for each quoted option price yields a corresponding implied volatility. The collection of these values, viewed as a function of time-to-expiry $\tau$ and log-moneyness $k$ \cite{gatheral2014ssvi}, defines the implied volatility surface. This surface provides a three-dimensional snapshot of how the market prices uncertainty across strikes and maturities.
+
+The implied volatility surface exhibits two well-documented structural features \cite{gatheral2014ssvi}. Across strikes at a fixed maturity, implied volatility typically forms a skewed smile. Across maturities, it displays a term structure that rises or falls with prevailing market conditions. These features summarise how observed option prices vary across the strike--expiry domain and make the surface an important input for derivative pricing, hedging, and portfolio risk measurement.
+
+Because options trade only at a discrete and irregularly spaced set of strikes and maturities, and because this set changes as contracts expire and new ones are listed, the implied volatility surface is not directly observable as a continuous object. It must instead be reconstructed from noisy market quotes through interpolation, extrapolation, and smoothing. Constructing and quantifying the uncertainty of this reconstruction is the central problem this thesis addresses.
+
+\subsection{No-Arbitrage Conditions}
+\label{subsec:no_arbitrage}
+
+Not every smooth surface defined over the strike--expiry domain corresponds to a financially consistent option-price surface. Static no-arbitrage requirements are commonly expressed through calendar and butterfly conditions, as formalised in Theorem 2.1 of Gonon et al.\ \cite{gonon2024operator} and related to the SVI framework of Gatheral and Jacquier \cite{gatheral2014ssvi}:
+
+\begin{itemize}
+    \item \textbf{No-calendar-arbitrage:} At fixed log-moneyness, total implied variance $\tau v(\tau,k)^2$ must not decrease as maturity increases. This condition corresponds to the required ordering of option prices across maturities \cite{gonon2024operator}.
+
+    \item \textbf{No-butterfly-arbitrage:} At each fixed maturity, the corresponding call-option prices must be convex in strike. In implied-volatility terms, this is expressed through a condition involving the smile and its strike derivatives and ensures that the associated risk-neutral density remains non-negative \cite{gonon2024operator}.
+\end{itemize}
+
+These conditions provide the financial basis for the post-processing routine used in this thesis. On a regular grid, the routine applies the corresponding discrete calendar and butterfly conditions to the lower and upper band surfaces. The analytic conditions and their implementation are discussed in Chapter~\ref{chap:methodology}.
+
+\section{Implied Volatility Smoothing}
+\label{sec:iv_smoothing}
+
+\subsection{Parametric Approaches}
+\label{subsec:parametric}
+
+The task of implied volatility smoothing refers to fitting a smooth, arbitrage-free surface $\hat{v}$ to a finite collection $\mathbf{v} = \{v(\tau_i, k_l)\}_{l=1}^{p}$ of observed implied volatilities \cite{gonon2024operator}. Direct interpolation schemes such as cubic splines can produce smooth fits, but they do not automatically enforce the calendar and butterfly conditions required across the surface.
+
+The industry-standard approach is the Stochastic Volatility Inspired (SVI) model \cite{gatheral2014ssvi}, which parameterises total implied variance at each maturity using a five-parameter functional form that captures the characteristic skew and smile. Its extension to full surfaces through the Surface SVI (SSVI) parameterisation \cite{gatheral2014ssvi} provides tractable conditions under which the resulting surface is free of static arbitrage. SVI and its variants have been widely adopted by practitioners.
+
+Despite their practical success, parametric models require a new numerical optimisation whenever the set of market quotes is updated. The resulting calibration depends on the chosen parameterisation, objective function, and optimisation procedure \cite{gonon2024operator}.
+
+\subsection{Neural Network-Based Approaches}
+\label{subsec:nn_smoothing}
+
+The limitations of parametric calibration have motivated a growing body of research on neural network-based implied volatility smoothing. Ackerer et al.\ \cite{ackerer2020deep} introduced deep neural network architectures combined with no-arbitrage soft constraints for volatility surface construction. Their framework also reports uncertainty estimates in regions with few or no observations, although it does not provide conformal coverage guarantees.
+
+A related line of work applies variational autoencoders to volatility smoothing \cite{bergeron2022variational}, exploiting the fixed-grid structure of FX options markets where strikes are quoted at standard deltas. As noted by Gonon et al.\ \cite{gonon2024operator}, this specificity limits direct application to equity index options such as SPX, where the set of available strikes and maturities changes continuously as contracts expire and new ones are listed.
+
+A further limitation of classical neural network architectures in this setting is the requirement for fixed-size inputs \cite{gonon2024operator}. Options data is inherently irregular: at each point in time, a different collection of strikes and maturities is available. Applying standard feedforward or convolutional networks therefore requires additional preprocessing and a fixed representation of the changing market data.
+
+\subsection{Operator Deep Smoothing}
+\label{subsec:ops}
+
+Gonon, Jacquier, and Wiedemann \cite{gonon2024operator} address the irregular structure of options data by recasting implied volatility smoothing as an operator learning problem. Rather than fitting a parameterised function to each new set of market quotes, they train a map
+\[
+F : \mathcal{A} \rightarrow \mathcal{U}
+\]
+between function spaces, where the input $\mathcal{A}$ consists of collections of observed implied volatilities and the output $\mathcal{U}$ is the space of smooth surface functions. At inference time, this operator is evaluated in a single forward pass, bypassing the per-instance optimisation loop that parametric calibration requires.
+
+The market observations are treated as point samples of a continuous volatility function $v : D \to \mathbb{R}$, where $D$ is defined in the transformed coordinates
+\[
+\rho = \sqrt{\tau}, \qquad z = k/\rho,
+\]
+giving $D = (0.01, 1) \times (-1.5, 0.5)$. These coordinates spread the data more uniformly across the input domain \cite{gonon2024operator}.
+
+The architecture they adopt is the Graph Neural Operator (GNO) of Li et al.\ \cite{li2020neural}. Its graph-based kernel aggregation can process observations on irregular and changing sets of input locations. Gonon et al.\ \cite{gonon2024operator} make one structural modification by removing the pointwise linear transformation from the first GNO layer. This allows the first hidden state to be evaluated at output locations that need not coincide with the observed input locations. Together, the graph construction and this modification enable the model to map changing collections of quoted strikes and maturities to a smoothed surface without fixed-grid preprocessing.
+
+The model is trained on nine years of intraday S\&P 500 options data (2012--2020). On the held-out 2021 test year, it achieves substantially lower mean absolute percentage error than the SVI benchmark. The reported calendar and butterfly penalty terms are zero or effectively zero on average across the test set \cite{gonon2024operator}.
+
+The trained model is deterministic and returns a single smoothed surface without accompanying prediction intervals. The present thesis complements this surface estimate with conformal uncertainty bands.
+
+\section{Conformal Prediction}
+\label{sec:conformal_background}
+
+\subsection{Foundations}
+\label{subsec:cp_foundations}
+
+Conformal prediction was originally developed by Vovk, Gammerman, and Shafer; the framework is surveyed by Shafer and Vovk~\cite{shafer2008tutorial} and, more recently, by Angelopoulos and Bates~\cite{angelopoulos2023gentle}. Its central property is the ability to produce prediction sets with finite-sample marginal coverage guarantees without imposing any parametric assumptions on the data-generating process. The key condition required is \emph{exchangeability}: the joint distribution of the calibration and test observations must remain unchanged when their indices are permuted \cite{angelopoulos2023gentle}. This condition is natural for observations drawn from a common stable process, while temporally ordered financial data require additional care.
+
+Following the split conformal construction described in Angelopoulos and Bates~\cite{angelopoulos2023gentle}, the procedure works as follows. Given a pre-trained deterministic predictor and a held-out calibration dataset $\{(X_i,Y_i)\}_{i=1}^{n}$, a nonconformity score $A(X_i,Y_i)$ is computed for each calibration point, quantifying how poorly the predictor accounts for that observation. The $(1-\alpha)$-quantile of these $n$ scores, corrected for the finite sample size, is
+\begin{equation}
+    \hat{q}_{1-\alpha} = \mathrm{Quantile}_{\lceil(n+1)(1-\alpha)\rceil/n}\!\left(\{A(X_i,Y_i)\}_{i=1}^{n}\right).
+\end{equation}
+For a new test input $X_{n+1}$, the prediction set is then
+\begin{equation}
+    \mathcal{C}(X_{n+1})
+    =
+    \{y : A(X_{n+1},y) \leq \hat{q}_{1-\alpha}\}.
+\end{equation}
+Under exchangeability of the $n+1$ data points, this construction satisfies the marginal coverage guarantee
+\begin{equation}
+    \mathbb{P}\left(
+    Y_{n+1} \in \mathcal{C}(X_{n+1})
+    \right)
+    \geq 1-\alpha.
+\end{equation}
+The guarantee is non-asymptotic: it holds for every finite $n$ and for any choice of underlying predictor and nonconformity score, without requiring the model to be well-specified or calibrated in any distributional sense \cite{shafer2008tutorial, angelopoulos2023gentle}. Importantly, this is a marginal statement about an individual test observation. In the present application, the conformal intervals are evaluated over the strike-expiry domain and together form complete lower and upper band surfaces around the GNO estimate. The marginal guarantee applies to an individual evaluation location and does not require every location on a daily surface to be covered simultaneously.
+
+\subsection{Inductive Conformal Prediction}
+\label{subsec:icp}
+
+The computationally practical version of conformal prediction is the inductive (or split) conformal predictor \cite{papadopoulos2002inductive, lei2018distribution, angelopoulos2023gentle}. It uses a held-out calibration set that is separate from the training data, computing nonconformity scores only once rather than retraining the predictor for each test point. This separation makes inductive conformal prediction directly applicable as a post-hoc wrapper around any pre-trained model, which is the approach adopted in this thesis.
+
+\subsection{Nonconformity Scores}
+\label{subsec:nonconformity}
+
+The choice of nonconformity score determines the shape and adaptivity of the resulting prediction sets \cite{angelopoulos2023gentle}. The simplest choice for regression is the absolute residual $A(x, y) = |\hat{f}(x) - y|$, which yields symmetric prediction intervals of constant width. More adaptive scores normalise the residual by an estimate of local uncertainty, producing intervals that are wider in regions where the model is less reliable. Conformalized Quantile Regression (CQR) \cite{romano2019conformalized} uses quantile regression estimates to produce locally adaptive prediction intervals with valid marginal coverage. The design of economically motivated nonconformity scores tailored to implied volatility is one of the central contributions of this thesis.
+
+\subsection{Mondrian Conformal Prediction}
+\label{subsec:mondrian}
+
+Mondrian conformal prediction \cite{shafer2008tutorial, angelopoulos2023gentle} extends the basic framework toward group-conditional coverage by partitioning the input space into disjoint bins and computing a separate conformal quantile within each bin. Under exchangeability, the unmodified Mondrian construction provides marginal coverage conditional on membership in a predefined bin. This is particularly relevant for implied volatility surfaces, where uncertainty varies systematically with liquidity across the strike-expiry domain. In this thesis, spatial binning is used primarily to create adaptive band widths across the surface, and its coverage behaviour is assessed empirically.
+
+\subsection{Conformal Prediction for Time Series}
+\label{subsec:cp_timeseries}
+
+Applying conformal prediction to financial data requires particular care because financial time series exhibit serial dependence and changing market regimes. As a result, the relevance of older calibration observations can decrease over time. One practical response is to restrict calibration to a sliding window of the most recent observations, so that the conformal quantile reflects current rather than distant historical conditions \cite{barber2023conformal, angelopoulos2023gentle}. Although a rolling window does not by itself establish exchangeability, it makes the calibration responsive to evolving market conditions. Rolling window calibration is therefore used in this thesis, and its coverage in the time-dependent setting is assessed empirically.
+
+\section{Uncertainty Quantification in Financial Machine Learning}
+\label{sec:uq_finance}
+
+Predictive uncertainty is a broad concern in machine learning and is directly relevant to financial forecasting and risk management. General approaches include Monte Carlo dropout \cite{gal2016dropout}, which estimates uncertainty through repeated stochastic forward passes, and deep ensembles \cite{lakshminarayanan2017simple}, which combine predictions from multiple independently trained networks. These methods provide useful uncertainty estimates but require either repeated model evaluations or the training of several models. Conformal prediction offers a model-agnostic alternative that calibrates prediction sets using held-out observations and, under exchangeability, provides finite-sample marginal coverage.
+
+Research connected to options has considered neural networks in several related settings. Wiese et al.\ \cite{wiese2019deep} use generative models to simulate equity option-market time series, while Ruf and Wang \cite{ruf2020hedging} study neural networks for option hedging. These applications differ from constructing uncertainty bands around a smoothed implied volatility surface. More directly, Ackerer et al.\ \cite{ackerer2020deep} construct arbitrage-aware neural-network implied volatility surfaces and quantify prediction uncertainty in sparsely observed regions, but do not use conformal calibration or neural operators. Canete~\cite{canete2023market} applies online conformal prediction by treating implied volatility as a point forecast of future realised volatility, rather than constructing bands around a smoothed implied volatility surface. Ma et al.\ \cite{ma2024calibrated} combine conformal prediction with operator learning for scientific and engineering problems, including Darcy flow and car-surface pressure prediction, but not for financial surfaces. Within the literature reviewed in this thesis, no previous study was identified that combines conformal prediction with neural-operator implied volatility smoothing. The present thesis investigates this specific combination.
+
+\section{Summary}
+\label{sec:lit_summary}
+
+This chapter has established the financial and statistical foundations of the thesis. The implied volatility surface is a central object in options markets and is shaped by calendar and butterfly conditions. Classical parametric methods calibrate this surface instance-by-instance, whereas the operator deep smoothing approach of Gonon et al.\ \cite{gonon2024operator} learns a mapping from irregular market observations to a smooth surface that can be evaluated in a single forward pass. The resulting GNO estimate is deterministic, and this thesis complements it with conformal uncertainty bands. Under exchangeability, conformal prediction provides a distribution-free framework for constructing prediction sets with finite-sample marginal coverage. Evaluating the calibrated intervals over the strike-expiry domain produces complete lower and upper surfaces around the GNO estimate. Rolling window calibration makes the procedure responsive to changing market conditions, while Mondrian binning provides spatial adaptation across the surface. Their performance in the time-dependent financial setting is evaluated empirically. The following chapter presents the methodology that combines these elements into an uncertainty quantification framework for implied volatility surfaces.

@@ -1,0 +1,338 @@
+\chapter{Experiments and Results}
+\label{chap:results}
+
+This chapter reports the empirical evaluation of the conformal uncertainty quantification framework developed in Chapter~\ref{chap:methodology} and implemented in Chapter~\ref{chap:implementation}. The evaluation is organised around the six research objectives set out in Section~\ref{sec:objectives}: whether the framework achieves the nominal coverage level on held-out market data, whether the rolling window and Mondrian spatial binning produce stable and spatially adaptive quantiles, whether the no-arbitrage projection reliably eliminates butterfly and calendar violations, and whether the resulting bands are sharp enough to be practically informative. Section~\ref{sec:exp_setup} specifies the dataset and evaluation protocol. Section~\ref{sec:exp_calibration} examines quantile behaviour during the calibration phase. Section~\ref{sec:exp_arbitrage} presents the no-arbitrage projection results for both scores and establishes why Score B is the recommended construction. Section~\ref{sec:exp_ablation} reports the full Score A versus Score B comparison across coverage, sharpness, and projection tractability. Sections~\ref{sec:exp_coverage} and~\ref{sec:exp_sharpness} then report the detailed coverage and sharpness results for Score B as the primary framework. Section~\ref{sec:exp_summary} summarises the findings.
+
+\section{Experimental Setup}
+\label{sec:exp_setup}
+
+The empirical dataset comprises 56 S\&P 500 (SPX) option surface snapshots successfully collected between 11 December 2025 and 15 August 2026. The option chains were obtained through OpenBB using its Cboe provider and stored in a WRDS-compatible CSV schema, as described in Section~\ref{sec:impl_data}. They are loaded by the \texttt{WRDSOptionsDataset} class, whose name refers to the expected schema rather than the source of the observations. The first 15 surfaces, with collection dates from 11 December 2025 to 23 January 2026, form the initial calibration set. The remaining 41 surfaces, with collection dates from 29 January 2026 to 15 August 2026, are evaluated sequentially using a walk-forward procedure. The collection dates are irregularly spaced because provider-side API errors and timeouts prevented successful retrieval on some scheduled dates. The analysis uses all successfully obtained surfaces in chronological order so that no later surface enters an earlier calibration window. Each processed surface contains between 8{,}677 and 11{,}325 option quotes in the transformed coordinate domain $D = (0.01, 1) \times (-1.5, 0.5)$.
+
+The structure of the dataset is illustrated in Figure~\ref{fig:dataset_overview} of Chapter~\ref{chap:implementation}, which shows the option quote count per surface and the calibration/evaluation timeline across all 56 surfaces.
+
+The point predictor underlying the framework is the pre-trained GNO of Gonon, Jacquier, and Wiedemann~\cite{gonon2024operator}, loaded from the checkpoint \texttt{train/store/9448705/checkpoints/checkpoint\_final.pt}. The model has 102,529 parameters and is run in inference mode without any retraining or fine-tuning on the SPX data used here. The conformal layer is applied post-hoc, as described in Chapter~\ref{chap:methodology}: the GNO point predictions are fixed, and all calibration and band construction is performed solely through the conformal pipeline. All hyperparameters are as listed in Table~\ref{tab:hyperparams} of Chapter~\ref{chap:implementation}: coverage level $1-\alpha = 90\%$, rolling window $K = 5$ surfaces, $4\times 4$ Mondrian binning, shrinkage $\lambda = 0.3$, minimum bin population 10, projection step size $\eta = 0.8$, and maximum 500 projection iterations.
+
+The primary evaluation is conducted using Score B (Vega-normalised implied volatility error, Section~\ref{subsec:score_b}) with Vega-IV bands (Section~\ref{subsec:vega_iv_mode}), which is the construction recommended by this thesis. Score A (spread-normalised price error, Section~\ref{subsec:score_a}) with price-spread bands (Section~\ref{subsec:price_spread_mode}) is evaluated under identical conditions as an ablation, to examine how the choice of nonconformity score affects coverage stability, sharpness, and the tractability of the no-arbitrage projection. Because both scores are applied to the same GNO predictions on the same dataset, any differences in the reported metrics are attributable solely to the nonconformity score and band construction.
+
+\section{Calibration Behaviour}
+\label{sec:exp_calibration}
+
+During the calibration phase the pipeline processes each of the 15 calibration surfaces in chronological order. After each surface is added to the rolling window, the global and Mondrian quantiles are recomputed on the scores currently in the window. This section reports the behaviour of those quantiles for Score B across the calibration period, since Score B is the primary construction and its quantiles are the ones used for the main coverage evaluation in Section~\ref{sec:exp_coverage}.
+
+\subsection{Rolling Window Warm-up}
+\label{subsec:exp_warmup}
+
+The rolling window accumulates surfaces until it reaches its capacity of $K = 5$. During this warm-up period, surfaces 0 through 4 (11 December 2025 to 25 December 2025), the calibration set grows with each step. The global 90\% conformal quantile is 0.016228 after the first surface and reaches 0.015954 once the window is full at surface 4. These values are closely grouped: each surface in this period contributes between 8{,}677 and 8{,}966 quotes to the window, so even the one-surface window contains a large number of calibration points and produces a stable quantile estimate.
+
+From surface 5 onward the window operates in steady state, discarding the oldest surface as each new one is added. The global quantile fluctuates as the window advances but generally increases across the calibration period, reaching 0.017303 at surface 10 (7 January 2026) and 0.017689 at surface 14 (23 January 2026), the final calibration surface. This behaviour shows how the rolling procedure adapts the calibration threshold as the recent score distribution changes.
+
+\subsection{Global versus Mondrian Quantiles}
+\label{subsec:exp_global_mondrian}
+
+Throughout the calibration period the Mondrian quantiles span a substantially wider range than the single global quantile, confirming that Score B nonconformity varies across the implied volatility surface. At surface 0, when the window contains only a single surface, the Mondrian bin quantiles range from 0.012505 to 0.033761, a ratio of approximately 2.7 between the lowest and highest bin. By surface 14, after the window has operated in steady state for ten surfaces, the range is $[0.011950,\,0.040613]$, a ratio of approximately 3.4.
+
+This spatial variation is the type of heterogeneity that Mondrian conformal prediction~\cite{shafer2008tutorial,angelopoulos2023gentle} is designed to capture. The global construction applies one calibration threshold across the full domain, whereas the Mondrian construction assigns each point the quantile of the bin containing its $(\rho,z)$ coordinates. Both constructions subsequently use the local Vega weight when converting the quantile into an implied volatility band. The practical effect of the bin-specific thresholds on evaluation coverage and sharpness is examined in Sections~\ref{sec:exp_coverage} and~\ref{sec:exp_sharpness}.
+
+Table~\ref{tab:calibration_quantiles} reports the global and Mondrian quantile range at each of the 15 calibration surfaces for Score B, and Figure~\ref{fig:quantile_evolution} displays the same information graphically alongside the per-surface mean Score B value.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|l|c|c|c|}
+\hline
+\textbf{Idx} & \textbf{Date} & \textbf{Global $\hat{q}$} & \textbf{Mondrian min} & \textbf{Mondrian max} \\
+\hline
+0  & 2025-12-11 & 0.016228 & 0.012505 & 0.033761 \\
+1  & 2025-12-21 & 0.016201 & 0.011879 & 0.036719 \\
+2  & 2025-12-23 & 0.015930 & 0.011457 & 0.033356 \\
+3  & 2025-12-24 & 0.015941 & 0.012101 & 0.032480 \\
+4  & 2025-12-25 & 0.015954 & 0.011960 & 0.032213 \\
+5  & 2025-12-26 & 0.015683 & 0.011660 & 0.031414 \\
+6  & 2025-12-27 & 0.016138 & 0.012247 & 0.033058 \\
+7  & 2026-01-02 & 0.016299 & 0.012350 & 0.034665 \\
+8  & 2026-01-03 & 0.016293 & 0.011870 & 0.039508 \\
+9  & 2026-01-06 & 0.016585 & 0.011685 & 0.040585 \\
+10 & 2026-01-07 & 0.017303 & 0.011696 & 0.040894 \\
+11 & 2026-01-09 & 0.016635 & 0.011013 & 0.041116 \\
+12 & 2026-01-14 & 0.017353 & 0.010963 & 0.041055 \\
+13 & 2026-01-15 & 0.017806 & 0.011478 & 0.040656 \\
+14 & 2026-01-23 & 0.017689 & 0.011950 & 0.040613 \\
+\hline
+\end{tabular}
+\caption{Score B calibration quantiles across 15 surfaces.}
+\label{tab:calibration_quantiles}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{Figures/fig_quantile_evolution.png}
+    \caption{Score B global quantile $\hat{q}$, Mondrian quantile range, and per-surface mean score across the 15 calibration surfaces.}
+    \label{fig:quantile_evolution}
+\end{figure}
+
+\section{No-Arbitrage Projection}
+\label{sec:exp_arbitrage}
+
+The conformal construction is complemented by a post-processing step that improves the financial consistency of the lower and upper band surfaces. As discussed in Section~\ref{subsec:projection_algorithm}, the routine operates on a rectangular $(\rho,z)$ grid and alternates between calendar and butterfly conditions. The calendar step enforces non-decreasing total variance across maturities at fixed $z$, while the butterfly step enforces convexity of total implied variance across $z$ for each maturity. The projection is applied to both band surfaces before the final coverage and violation counts are evaluated.
+
+\subsection{Aggregate Violation Counts}
+\label{subsec:exp_arb_counts}
+
+For each evaluation surface, calendar and butterfly violations are counted separately on the lower and upper Mondrian bands and then summed. Table~\ref{tab:arbitrage} reports the aggregate counts over all 41 walk-forward evaluation surfaces. It also reports quote-level band crossings after projection, defined as locations where the projected lower bound exceeds the projected upper bound.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+\textbf{Score} & \textbf{Before} & \textbf{After} & \textbf{Reduction} & \textbf{Crossings after} \\
+\hline
+Score A (spread) & 82{,}190 & 43{,}471 & 47.1\% & 0 \\
+Score B (Vega)   & 59{,}414 & 0       & 100.0\% & 0 \\
+\hline
+\end{tabular}
+\caption{Combined calendar and butterfly violation counts on the lower and upper Mondrian bands across 41 walk-forward evaluation surfaces.}
+\label{tab:arbitrage}
+\end{table}
+
+Figures~\ref{fig:calendar_arbitrage} and~\ref{fig:butterfly_arbitrage} illustrate the calendar and butterfly conditions on the lower Score B band for the first evaluation surface (surface 15, 29 January 2026). The left panels show selected slices before projection and the right panels show the corresponding slices after projection. Because the figures display selected lower-band slices, their violation counts differ from the aggregate totals in Table~\ref{tab:arbitrage}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{Figures/fig_calendar_arbitrage.png}
+    \caption{Calendar condition in selected slices of the lower Score B band for surface 15, before and after projection.}
+    \label{fig:calendar_arbitrage}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{Figures/fig_butterfly_arbitrage.png}
+    \caption{Butterfly condition in selected maturity slices of the lower Score B band for surface 15, before and after projection.}
+    \label{fig:butterfly_arbitrage}
+\end{figure}
+
+\subsection{Score B: Elimination of Violations}
+\label{subsec:exp_arb_scoreb}
+
+For Score B, the projection reaches zero residual calendar and butterfly violations on every evaluation surface, reducing the combined lower-and-upper count from 59{,}414 to zero. The projected bands also have zero quote-level crossings on all 41 surfaces. This confirms that the projection consistently enforces the calendar and butterfly conditions used by the grid-based routine across all evaluation surfaces.
+
+\subsection{Score A: Partial Violation Reduction}
+\label{subsec:exp_arb_scorea}
+
+For Score A, the combined violation count decreases from 82{,}190 to 43{,}471, a reduction of 47.1\%, but does not reach zero on any of the 41 evaluation surfaces. The projected Score A bands nevertheless retain the correct lower--upper ordering, with zero quote-level crossings. Together with the much greater band width reported in Section~\ref{subsec:ablation_width}, the remaining violations make Score A less suitable than Score B for the final framework. Score A is therefore retained as a comparative baseline rather than used as the primary band construction.
+
+\section{Nonconformity Score Comparison}
+\label{sec:exp_ablation}
+
+The projection results in Section~\ref{sec:exp_arbitrage} show different behaviour for the two scores: Score B reaches zero residual calendar and butterfly violations under the grid-based routine, whereas Score A substantially reduces the counts but retains residual violations. This section compares score magnitude, band width, and coverage stability to explain why Score B is selected as the primary construction.
+
+\subsection{Score Magnitude and Quantile Scale}
+\label{subsec:ablation_magnitude}
+
+The two scores use different normalisations and therefore operate at different numerical scales. Score B is a Vega-weighted IV residual. Because both experiments use the same GNO predictions, their mean prediction error is identical at MAE $= 0.006789$ IV units. For Score B, the global calibration quantile is 0.017689 on the final calibration surface.
+
+Score A is a spread-normalised price residual. On the first calibration surface (11 December 2025), the median Score A value is 0.9717 and the 90th percentile is 3.6784, with the maximum reaching 33.0850. Its global conformal quantile is 3.683856 on that surface and increases to values of approximately 20--22 as the rolling window advances. Score A divides the price residual by the bid--ask spread, subject to the implemented minimum spread of 0.10. Because the Score A and Score B quantiles enter different band-construction formulas, Equations~\ref{eq:price_band_halfwidth} and~\ref{eq:iv_band_halfwidth}, their raw magnitudes are not directly comparable. Their practical effects are instead compared below using IV-space band width and coverage.
+
+\subsection{Band Width}
+\label{subsec:ablation_width}
+
+Table~\ref{tab:ablation_width} reports the mean and median IV band widths for both scores across the 41 evaluation surfaces, after Mondrian quantile assignment and no-arbitrage projection. Each entry is the average of the corresponding per-surface statistic.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Metric} & \textbf{Score A (spread)} & \textbf{Score B (vega)} \\
+\hline
+Mean band width (IV)   & 0.1491 & 0.0273 \\
+Median band width (IV) & 0.1148 & 0.0262 \\
+\hline
+\end{tabular}
+\caption{Average per-surface mean and median IV band widths across the 41 evaluation surfaces.}
+\label{tab:ablation_width}
+\end{table}
+
+Score A produces bands that are on average 5.5 times wider than Score B in mean IV width and 4.4 times wider in median IV width. The Score A bands are therefore considerably less sharp. Score B achieves a mean width of 0.027 IV units while retaining mean coverage above the nominal target, as reported below. Its local widths reflect the bin-specific Mondrian quantiles together with the subsequent projection.
+
+\subsection{Coverage Stability}
+\label{subsec:ablation_coverage}
+
+Table~\ref{tab:ablation_coverage} reports the post-projection per-surface Mondrian coverage for both scores alongside the overall mean and standard deviation across all 41 evaluation surfaces.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|c|l|c|c|}
+\hline
+\textbf{Idx} & \textbf{Date} & \textbf{Score A coverage} & \textbf{Score B coverage} \\
+\hline
+15 & 2026-01-29 & 99.43\% & 91.44\% \\
+16 & 2026-01-30 & 89.60\% & 92.28\% \\
+17 & 2026-02-11 & 91.77\% & 91.91\% \\
+18 & 2026-02-14 & 93.76\% & 91.96\% \\
+19 & 2026-02-17 & 96.61\% & 91.52\% \\
+20 & 2026-03-03 & 96.14\% & 92.15\% \\
+21 & 2026-04-10 & 90.43\% & 92.03\% \\
+22 & 2026-04-16 & 95.78\% & 93.40\% \\
+23 & 2026-04-17 & 95.48\% & 92.23\% \\
+24 & 2026-05-08 & 97.33\% & 95.60\% \\
+25 & 2026-05-13 & 94.67\% & 90.98\% \\
+26 & 2026-05-14 & 97.53\% & 91.72\% \\
+27 & 2026-05-15 & 99.05\% & 94.88\% \\
+28 & 2026-05-18 & 94.54\% & 90.75\% \\
+29 & 2026-05-19 & 97.22\% & 91.66\% \\
+30 & 2026-05-20 & 98.16\% & 92.72\% \\
+31 & 2026-05-21 & 98.40\% & 91.33\% \\
+32 & 2026-05-22 & 97.19\% & 93.89\% \\
+33 & 2026-06-04 & 93.72\% & 89.92\% \\
+34 & 2026-06-05 & 85.65\% & 90.78\% \\
+35 & 2026-06-16 & 89.42\% & 88.35\% \\
+36 & 2026-06-23 & 93.72\% & 92.62\% \\
+37 & 2026-06-24 & 95.43\% & 90.68\% \\
+38 & 2026-06-26 & 97.18\% & 94.76\% \\
+39 & 2026-06-27 & 99.20\% & 89.60\% \\
+40 & 2026-07-02 & 93.81\% & 91.80\% \\
+41 & 2026-07-03 & 95.16\% & 87.57\% \\
+42 & 2026-07-07 & 92.02\% & 90.77\% \\
+43 & 2026-07-08 & 94.65\% & 90.64\% \\
+44 & 2026-07-15 & 96.64\% & 94.45\% \\
+45 & 2026-07-17 & 97.42\% & 89.13\% \\
+46 & 2026-07-18 & 96.37\% & 90.92\% \\
+47 & 2026-07-30 & 98.03\% & 89.87\% \\
+48 & 2026-07-31 & 96.08\% & 89.72\% \\
+49 & 2026-08-04 & 93.06\% & 90.41\% \\
+50 & 2026-08-05 & 98.69\% & 91.19\% \\
+51 & 2026-08-06 & 92.28\% & 88.66\% \\
+52 & 2026-08-07 & 86.73\% & 91.51\% \\
+53 & 2026-08-08 & 90.81\% & 92.37\% \\
+54 & 2026-08-11 & 93.35\% & 87.56\% \\
+55 & 2026-08-15 & 92.77\% & 89.07\% \\
+\hline
+\textbf{Mean} & & \textbf{94.76\%} & \textbf{91.34\%} \\
+\textbf{Std}  & & \textbf{3.31\%}  & \textbf{1.86\%}  \\
+\hline
+\end{tabular}
+\caption{Post-projection per-surface Mondrian coverage for Score A and Score B across all 41 evaluation surfaces. Target: $1-\alpha = 90\%$.}
+\label{tab:ablation_coverage}
+\end{table}
+
+Figure~\ref{fig:coverage_comparison} shows the post-projection per-surface coverage for both scores, together with the 90\% nominal target. Figure~\ref{fig:band_width_comparison} separately shows their mean IV band widths across the same 41 evaluation surfaces.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{Figures/fig_coverage_comparison.png}
+    \caption{Post-projection per-surface Mondrian coverage for Score A and Score B across the 41 evaluation surfaces.}
+    \label{fig:coverage_comparison}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{Figures/fig_band_width_comparison.png}
+    \caption{Post-projection mean IV band width for Score A and Score B across the 41 evaluation surfaces. The two vertical axes show the different width scales of the two scores.}
+    \label{fig:band_width_comparison}
+\end{figure}
+
+Both scores achieve mean coverage above the 90\% nominal target over the full evaluation period. However, their coverage distributions differ. Score A's standard deviation of 3.31 percentage points is 1.8 times larger than Score B's 1.86 percentage points. Score A's coverage ranges from 85.65\% (surface 34) to 99.43\% (surface 15), a spread of nearly 14 percentage points, showing greater variation across evaluation surfaces.
+
+Score B's coverage ranges from 87.56\% to 95.60\%, a spread of approximately 8.0 percentage points. It falls below the 90\% target on 10 of the 41 evaluation surfaces, whereas Score A falls below the target on 4 surfaces. Although Score A has fewer below-target surfaces, it combines a higher mean coverage of 94.76\% with substantially wider bands. Score B has a mean coverage of 91.34\%, lower variation across surfaces, and considerably narrower bands, providing a closer balance between coverage and sharpness.
+
+\subsection{Summary of Score Comparison}
+\label{subsec:ablation_summary}
+
+Across projection behaviour, band width, and empirical coverage, Score B provides the more balanced result. Score A retains residual calendar and butterfly violations under the grid-based routine and produces substantially wider bands. Score B reaches zero residual violations under the same routine, produces narrower bands, and achieves mean coverage closer to the nominal target with lower variation across surfaces. The two outcomes reflect their different constructions: Score B forms bands directly from Vega-weighted IV residuals, whereas Score A calibrates spread-normalised price residuals and then maps the resulting price bands into IV space. Score B is therefore the recommended construction for this framework, and all detailed results reported in Sections~\ref{sec:exp_coverage} and~\ref{sec:exp_sharpness} use Score B exclusively.
+
+\section{Coverage Results}
+\label{sec:exp_coverage}
+
+This section examines the empirical marginal coverage of the Score B framework in detail across the 41 held-out evaluation surfaces. Coverage is the fraction of market implied volatility quotes that fall within the constructed band at each evaluation surface, as defined in Section~\ref{sec:meth_metrics}. Two variants are reported at the same post-projection stage: the global construction uses a single scalar quantile from the rolling window, whereas the Mondrian construction uses per-bin quantiles from the same window. Both use the same $K = 5$ rolling window and the same projection routine; the difference is the quantile assignment.
+
+\subsection{Per-Surface Coverage}
+\label{subsec:exp_coverage_persurface}
+
+Table~\ref{tab:coverage_scoreb} reports the matched post-projection global and Mondrian coverage for Score B on each evaluation surface.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|c|l|c|c||c|l|c|c|}
+\hline
+\textbf{Idx} & \textbf{Date} & \textbf{Global} & \textbf{Mondrian} &
+\textbf{Idx} & \textbf{Date} & \textbf{Global} & \textbf{Mondrian} \\
+\hline
+15 & 2026-01-29 & 90.57\% & 91.44\% & 36 & 2026-06-23 & 89.01\% & 92.62\% \\
+16 & 2026-01-30 & 90.84\% & 92.28\% & 37 & 2026-06-24 & 88.27\% & 90.68\% \\
+17 & 2026-02-11 & 91.17\% & 91.91\% & 38 & 2026-06-26 & 91.97\% & 94.76\% \\
+18 & 2026-02-14 & 91.17\% & 91.96\% & 39 & 2026-06-27 & 88.31\% & 89.60\% \\
+19 & 2026-02-17 & 88.94\% & 91.52\% & 40 & 2026-07-02 & 91.63\% & 91.80\% \\
+20 & 2026-03-03 & 90.74\% & 92.15\% & 41 & 2026-07-03 & 88.93\% & 87.57\% \\
+21 & 2026-04-10 & 90.17\% & 92.03\% & 42 & 2026-07-07 & 89.07\% & 90.77\% \\
+22 & 2026-04-16 & 92.47\% & 93.40\% & 43 & 2026-07-08 & 87.48\% & 90.64\% \\
+23 & 2026-04-17 & 90.93\% & 92.23\% & 44 & 2026-07-15 & 91.59\% & 94.45\% \\
+24 & 2026-05-08 & 94.53\% & 95.60\% & 45 & 2026-07-17 & 90.20\% & 89.13\% \\
+25 & 2026-05-13 & 89.81\% & 90.98\% & 46 & 2026-07-18 & 89.95\% & 90.92\% \\
+26 & 2026-05-14 & 90.36\% & 91.72\% & 47 & 2026-07-30 & 89.53\% & 89.87\% \\
+27 & 2026-05-15 & 93.51\% & 94.88\% & 48 & 2026-07-31 & 90.12\% & 89.72\% \\
+28 & 2026-05-18 & 90.71\% & 90.75\% & 49 & 2026-08-04 & 88.61\% & 90.41\% \\
+29 & 2026-05-19 & 89.96\% & 91.66\% & 50 & 2026-08-05 & 90.82\% & 91.19\% \\
+30 & 2026-05-20 & 91.18\% & 92.72\% & 51 & 2026-08-06 & 89.52\% & 88.66\% \\
+31 & 2026-05-21 & 89.54\% & 91.33\% & 52 & 2026-08-07 & 91.24\% & 91.51\% \\
+32 & 2026-05-22 & 92.22\% & 93.89\% & 53 & 2026-08-08 & 91.31\% & 92.37\% \\
+33 & 2026-06-04 & 87.91\% & 89.92\% & 54 & 2026-08-11 & 86.12\% & 87.56\% \\
+34 & 2026-06-05 & 89.04\% & 90.78\% & 55 & 2026-08-15 & 88.77\% & 89.07\% \\
+35 & 2026-06-16 & 91.38\% & 88.35\% & & & & \\
+\hline
+\multicolumn{2}{|c|}{\textbf{Mean}} & \textbf{90.23\%} & \textbf{91.34\%} & & & & \\
+\multicolumn{2}{|c|}{\textbf{Std}} & \textbf{1.62\%} & \textbf{1.86\%} & & & & \\
+\hline
+\end{tabular}
+\caption{Matched post-projection Score B coverage on all 41 evaluation surfaces ($1-\alpha = 90\%$).}
+\label{tab:coverage_scoreb}
+\end{table}
+
+Over the full 41-surface evaluation period, the mean Mondrian coverage is 91.34\%, above the 90\% nominal target. Its standard deviation is 1.86 percentage points. The minimum Mondrian coverage is 87.56\% (surface 54, 11 August 2026), and the maximum is 95.60\% (surface 24, 8 May 2026). Mondrian coverage falls below the 90\% target on 10 of the 41 evaluation surfaces; these cases are considered in Section~\ref{subsec:exp_mondrian_contribution}.
+
+\subsection{Contribution of Mondrian Spatial Binning}
+\label{subsec:exp_mondrian_contribution}
+
+The global coverage column of Table~\ref{tab:coverage_scoreb} provides the comparison without spatial binning while retaining the same rolling window and projection stage. Its mean coverage is 90.23\%, compared with 91.34\% for Mondrian coverage.
+
+Mondrian spatial binning raises mean post-projection coverage by 1.10 percentage points. The improvement is visible on several individual surfaces. For example, coverage increases from 89.01\% to 92.62\% on surface 36 and from 87.48\% to 90.64\% on surface 43. Across the full evaluation period, 11 surfaces have global coverage below 90\% but Mondrian coverage at or above 90\%. These results show the benefit of assigning calibration quantiles by surface region rather than applying one value across the full domain.
+
+The ten surfaces where Mondrian coverage falls below 90\% are surfaces 33, 35, 39, 41, 45, 47, 48, 51, 54, and 55. Global coverage reaches at least 90\% on three of these surfaces (35, 45, and 48), showing that Mondrian binning improves average coverage but does not increase coverage on every individual surface. At each walk-forward step, coverage is evaluated using the preceding rolling window; the current surface is added only after its evaluation and can then contribute to the next window. The window therefore contains the five most recently processed surfaces without using future information. The remaining temporal variation and its relation to the conformal assumptions are discussed further in Chapter~\ref{chap:discussion}.
+
+\section{Sharpness}
+\label{sec:exp_sharpness}
+
+Coverage is a necessary condition for a useful prediction band but not a sufficient one: a very wide band can achieve high coverage while providing little information about the likely range of the surface. Sharpness measures the width of the prediction band. When coverage is comparable, narrower bands are generally more informative. This section reports the IV band widths produced by the Score B framework across all 41 evaluation surfaces.
+
+\subsection{Overall Band Width}
+\label{subsec:exp_width_overall}
+
+Averaging the per-surface mean IV band widths across the 41 evaluation surfaces gives 0.0273 IV units. The corresponding average of the per-surface median widths is 0.0262 IV units. These figures reflect the full pipeline, comprising Mondrian quantile assignment followed by Vega-IV band construction and no-arbitrage projection, and are measured on the scattered evaluation quotes after the projected grid values have been mapped back to the original $(\rho,z)$ coordinates.
+
+The GNO point-prediction MAE is 0.006789 IV units. The mean half-width of 0.0137 IV units is therefore approximately twice the average prediction error. Together with the mean Mondrian coverage of 91.34\%, this provides a direct summary of the observed relationship between coverage and band width.
+
+\subsection{Spatial Variation of Band Width}
+\label{subsec:exp_width_spatial}
+
+The Mondrian construction permits spatially varying band widths by assigning calibration quantiles according to the $(\rho,z)$ bin containing each point. At the final calibration surface, the bin quantiles range from $0.011950$ to $0.040613$ (Table~\ref{tab:calibration_quantiles}), a factor of approximately 3.4 between the lowest and highest calibration thresholds. This ratio describes variation in the thresholds rather than a direct factor-of-3.4 range in the final widths, which also depend on the local Vega weight and the subsequent projection. The width statistics reported above are averages of per-surface summaries computed over the evaluation quotes. As shown in Section~\ref{subsec:exp_mondrian_contribution}, this spatial assignment raises mean post-projection coverage relative to the global construction, although it does not increase coverage on every individual surface.
+
+\subsection{Sharpness Relative to Score A}
+\label{subsec:exp_width_vs_scorea}
+
+As established in Section~\ref{subsec:ablation_width}, Score A produces bands with a mean width of 0.1491 IV units, 5.5 times wider than Score B's 0.0273. Score A achieves mean coverage of 94.76\%, whereas Score B achieves 91.34\%, closer to the 90\% target. The comparison therefore shows a clear coverage--sharpness trade-off: Score A obtains higher coverage with substantially broader bands, while Score B provides considerably narrower bands with mean coverage closer to the nominal level. This difference reflects their distinct constructions: Score A calibrates spread-normalised price residuals and maps the resulting price bands into IV space, whereas Score B constructs the bands from Vega-weighted IV residuals.
+
+\section{Summary}
+\label{sec:exp_summary}
+
+This chapter has reported the empirical evaluation of the conformal uncertainty quantification framework on 56 successfully collected S\&P 500 options surface snapshots with collection dates spanning December 2025 to August 2026, with 15 surfaces used for initial calibration and 41 evaluated sequentially in walk-forward order.
+
+The calibration results in Section~\ref{sec:exp_calibration} showed that the Score B global quantile remained within a relatively narrow range across the calibration period. It moved from 0.01623 after the first surface to 0.01769 after the final calibration surface, with intermediate values ranging from 0.01568 to 0.01781 as the rolling window advanced. By the end of calibration, the Mondrian bin quantiles spanned a factor-of-3.4 range, showing that the Score B error distribution varies across regions of the implied volatility surface and that the $4\times4$ binning represents this spatial variation.
+
+The no-arbitrage projection results in Section~\ref{sec:exp_arbitrage} showed stronger performance for Score B under the implemented grid-based conditions. For Score B, the combined lower-and-upper calendar and butterfly count decreased from 59{,}414 to zero across the 41 evaluation surfaces. For Score A, it decreased from 82{,}190 to 43{,}471, a reduction of 47.1\%, while lower--upper crossings remained zero for both scores. Together with the substantially greater Score A band width, these results support the use of Score B as the primary construction and the retention of Score A as a comparative baseline.
+
+The Score A versus Score B comparison in Section~\ref{sec:exp_ablation} reinforced this conclusion across two further dimensions. Score A's mean Mondrian coverage of 94.76\% over 41 evaluation surfaces comes with a standard deviation of 3.31 percentage points and substantially wider bands. Score B's mean coverage of 91.34\%, which is closer to the 90\% target, has a standard deviation of 1.86 percentage points and considerably narrower bands.
+
+The detailed Score B coverage results in Section~\ref{sec:exp_coverage} showed that the Mondrian construction achieves a mean coverage of 91.34\% across the 41 evaluation surfaces. On 11 surfaces where global coverage is below the 90\% target, Mondrian binning raises coverage to at least 90\%. It does not improve every individual surface, and ten surfaces from June to August 2026 remain below 90\% after Mondrian assignment. This remaining temporal variation is considered further in Chapter~\ref{chap:discussion}.
+
+The sharpness results in Section~\ref{sec:exp_sharpness} showed that Score B produces bands with a mean IV width of 0.0273 units and a corresponding mean half-width of approximately 0.0137 units. The mean half-width is approximately twice the GNO's mean absolute error of 0.006789 IV units. Score B bands are 5.5 times narrower than Score A bands in mean IV width while maintaining mean empirical coverage above the nominal target.
+
+Taken together, the empirical results show that the proposed framework, comprising Score B nonconformity scores, $K=5$ rolling window calibration, $4\times4$ Mondrian spatial binning with $\lambda=0.3$ shrinkage, Vega-IV band construction, and no-arbitrage projection, produces spatially adaptive bands with mean coverage above the nominal target and substantially narrower widths than Score A. For Score B, the projection reduces the residual counts for the implemented calendar and butterfly conditions to zero on all evaluation surfaces. Chapter~\ref{chap:discussion} interprets these findings in the context of the exchangeability assumption, their practical implications, and the limitations of the current framework.

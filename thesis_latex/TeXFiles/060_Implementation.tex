@@ -1,0 +1,130 @@
+\chapter{Implementation}
+\label{chap:implementation}
+
+\section{Software Architecture}
+\label{sec:impl_architecture}
+
+The conformal uncertainty quantification framework is implemented as a self-contained Python package, \texttt{volatility\_smoothing/conformal/}, that operates entirely as a post-hoc wrapper around the pre-trained GNO. No modification is made to the base model's architecture, weights, or inference code; the package receives the GNO's point predictions as inputs and returns calibrated prediction bands as outputs. The package is structured into five modules, each encapsulating a component of the pipeline described in Chapter~\ref{chap:methodology}. Table~\ref{tab:modules} lists each module alongside its primary interface and its role in the framework.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{0.27\textwidth}|>{\raggedright\arraybackslash}p{0.29\textwidth}|X|}
+\hline
+\textbf{Module} & \textbf{Primary interface} & \textbf{Role} \\
+\hline
+\texttt{nonconformity\_scores.py} & \texttt{SpreadNormalizedScore} & Score A: spread-normalised price error \\
+                                  & \texttt{VegaNormalizedScore}  & Score B: Vega-normalised IV error \\
+\hline
+\texttt{rolling\_window.py}       & \texttt{RollingWindowCalibration} & FIFO window of the $K$ most recent calibration surfaces \\
+\hline
+\texttt{mondrian.py}              & \texttt{MondrianConformal}    & Spatial binning and per-bin quantile computation \\
+\hline
+\texttt{prediction\_bands.py}     & \texttt{PredictionBands}      & Band construction in price-spread and Vega-IV modes \\
+\hline
+\texttt{no\_arbitrage\_projection.py} & \texttt{project\_to\_arbitrage\_free} & Alternating butterfly and calendar projection \\
+\hline
+\end{tabularx}
+\caption{Modules of the \texttt{volatility\_smoothing/conformal/} package and their roles.}
+\label{tab:modules}
+\end{table}
+
+The five modules are wired together in the experiment notebook \texttt{conformal\_prediction.ipynb}, which serves as the authoritative integration point for the reported pipeline and is described in Section~\ref{sec:impl_notebook}. The notebook also contains a small verified helper layer for the exact conformal order statistic, consistent Score B weights, and projection diagnostics. These helpers retain the structure of the package while ensuring that the final experiment follows the methodology of Chapter~\ref{chap:methodology}. Each component is described in turn in the sections that follow.
+
+\section{Nonconformity Score Computation}
+\label{sec:impl_scores}
+
+Both nonconformity scores are implemented in \texttt{nonconformity\_scores.py} as subclasses of a common \texttt{NonconformityScore} base class, which defines a single \texttt{compute} method accepting the GNO's predicted implied volatilities, the market implied volatilities, and a dictionary of auxiliary data. A top-level dispatcher function, \texttt{compute\_scores\_from\_data}, selects the appropriate scorer based on a \texttt{score\_type} argument and assembles the auxiliary data from the raw surface dictionary produced by the dataloader before delegating to the scorer.
+
+Score A (\texttt{SpreadNormalizedScore}) works in price space. It takes three steps: (1) compute predicted and market prices from the corresponding implied volatilities using the Black-Scholes formula in transformed coordinates - $d_1 = -z/v + v\rho/2$ and $d_2 = -z/v - v\rho/2$, with call and put prices handled separately based on the sign of the log-moneyness $k = \rho z$, (2) read bid and ask prices directly from the dataloader as dollar-denominated quantities and floor the spread at $0.10$, (3) divide twice the absolute price residual by the floored spread, per Equation~\ref{eq:score_a}. When the market-price reference is the bid--ask midpoint and the observed spread exceeds the floor, a score below 1 indicates that the model price lies within the observed bid--ask interval. More generally, the score measures the price residual relative to the floored spread.
+
+Score B (\texttt{VegaNormalizedScore}) works directly in implied volatility space. In the final experiment, the notebook helper \texttt{score\_from\_data\_corrected} computes forward-normalised Vega at the GNO-predicted implied volatility, divides it by the mean Vega across the surface, and multiplies the absolute IV residual by the resulting relative weight. The completed weight ratio $\mathcal{V}/\bar{\mathcal{V}}$ is floored at \texttt{min\_weight}$=1.0$, so options with above-average Vega are up-weighted and no option is weighted below 1. Applying the floor to the completed ratio avoids collapsing the relative weights when forward-normalised Vega values are below 1. The same weighting convention is used when the Score B prediction bands are constructed.
+
+\section{Rolling Window Calibration}
+\label{sec:impl_rolling}
+
+The rolling window is implemented in \texttt{rolling\_window.py} as a \texttt{RollingWindowCalibration} class that maintains an ordered list of \texttt{CalibrationSurface} dataclasses, each storing the $(\rho, z)$ coordinates and nonconformity scores for one market snapshot. The window operates as a FIFO buffer of fixed size $K$: \texttt{add\_surface} appends a new surface and, if the list exceeds $K$ entries, discards the oldest. \texttt{get\_calibration\_data} concatenates the coordinates and scores across all surfaces currently in the window into flat arrays, which are passed directly to \texttt{MondrianConformal} for quantile computation. The window makes no assumption about the time spacing between surfaces - it counts snapshots, not elapsed time.
+
+Two state queries are available: \texttt{is\_ready} returns true as soon as at least one surface has been added, and \texttt{is\_full} returns true once the window has reached capacity $K$. In the experiment pipeline, quantile computation begins immediately after the first surface is added, so the Mondrian calibration runs on a growing window during the early calibration surfaces and on a full window of $K$ surfaces thereafter.
+
+\section{Mondrian Spatial Binning}
+\label{sec:impl_mondrian}
+
+Mondrian binning is implemented in \texttt{mondrian.py} as a \texttt{MondrianConformal} class. At initialisation, the domain $D = (0.01, 1) \times (-1.5, 0.5)$ is partitioned into a regular $B_\rho \times B_z$ grid of \texttt{MondrianBin} objects using evenly spaced edges along each axis. Each bin stores the list of nonconformity scores from the rolling window that fall within its boundaries.
+
+Calibration proceeds in two passes. The final experiment uses \texttt{ExactOrderStatisticMondrian}, a subclass defined in \texttt{conformal\_prediction.ipynb}, to apply the finite-sample conformal order statistic in Equation~\ref{eq:quantile}. First, the global quantile is computed over all scores in the window as a fallback. Second, per-bin quantiles are computed for bins that contain at least \texttt{min\_samples\_per\_bin} $= 10$ scores; bins below this threshold are assigned the global quantile directly. For bins that meet the threshold, the raw bin quantile is shrunk towards the global quantile by a factor $\lambda$:
+\begin{equation}
+    q_{\text{bin}} = \lambda\, \hat{q}_{1-\alpha} + (1 - \lambda)\, q^{\text{raw}}_{\text{bin}},
+\end{equation}
+with $\lambda = 0.3$ in the experiments of Chapter~\ref{chap:results}. This prevents bins that marginally exceed the minimum count from producing extreme quantile estimates while preserving the spatial adaptivity of well-populated bins.
+
+At test time, \texttt{get\_quantiles} assigns each test point the quantile of the bin containing its $(\rho, z)$ coordinates. Points that fall outside the domain boundaries are assigned the global quantile. Bin lookup uses \texttt{np.searchsorted} on the precomputed bin edges for efficient assignment.
+
+\section{Prediction Band Construction}
+\label{sec:impl_bands}
+
+Band construction is provided by \texttt{prediction\_bands.py} through the \texttt{PredictionBands} class. The construction accepts the GNO point predictions, the per-point global or Mondrian conformal quantiles, and the market data required by the chosen mode, and returns lower and upper bounds in both IV and price space. In the final pipeline, Score A uses \texttt{PredictionBands.compute}, while Score B uses the notebook helper \texttt{vega\_iv\_bands\_corrected} so that scoring and band construction share the same forward-normalised Vega weights.
+
+Under the Vega-IV mode, the corrected helper takes four steps: (1) compute forward-normalised Vega at each quote using the GNO-predicted IV, (2) form the normalised weight $w_V = \mathcal{V}/\bar{\mathcal{V}}$ and floor it at \texttt{min\_vega}$=1.0$, (3) divide the per-point conformal quantile by the weight to obtain the IV half-width $h_v = q / w_V$, and (4) subtract and add $h_v$ from the GNO prediction to obtain $v_{\text{lo}}$ and $v_{\text{hi}}$, with $v_{\text{lo}}$ clipped at $10^{-4}$ to ensure a strictly positive lower bound. Price bands are then recovered by evaluating the Black-Scholes formula at $v_{\text{lo}}$ and $v_{\text{hi}}$.
+
+Under the price-spread mode, \texttt{compute} takes three steps: (1) compute the GNO predicted price using the Black-Scholes formula, (2) read bid and ask prices from the dataloader and floor the spread at \texttt{min\_spread}$= 0.10$, (3) add and subtract the price half-width $h_P = (q/2) \cdot s$ from the predicted price to get $P_{\text{lo}}$ and $P_{\text{hi}}$. IV bands are then obtained by inverting the Black-Scholes price at each endpoint via \texttt{implied\_volatility\_from\_price}, which root-finds per point using Brent's method over the interval $[10^{-4}, 5.0]$. Points where no sign change is found within this interval are clipped to the nearest bound rather than raising an error.
+
+One important distinction is that the \texttt{black\_scholes\_price} function in this module produces dollar-denominated prices - that is, $\text{discount} \times \text{forward} \times \text{BS}(\tau, k, v)$ - rather than the forward-normalised, dimensionless $\text{BS}_\pm(x, v)$ used in Chapter~\ref{chap:methodology}. These currency units are used consistently with the observed bid and ask prices in Score A. Score B is constructed directly in implied-volatility space using the forward-normalised Vega weights described above.
+
+\section{No-Arbitrage Projection}
+\label{sec:impl_projection}
+
+The no-arbitrage projection is implemented in \texttt{no\_arbitrage\_projection.py} and consists of three functions: \texttt{check\_butterfly\_arbitrage}, \texttt{check\_calendar\_arbitrage}, and \texttt{project\_to\_arbitrage\_free}. In the final notebook, the scattered $(\rho,z)$ band values are represented on a rectangular grid whose rows correspond to the available $\rho$ values, with maturities $\tau=\rho^2$, and whose columns contain 50 evenly spaced $z$ values. The mapping is performed with \texttt{scipy.interpolate.griddata} using linear interpolation, with nearest-neighbour interpolation as a fallback outside the convex hull of the scattered data.
+
+The two check functions each return an \texttt{ArbitrageConstraints} dataclass recording the violation count and maximum violation magnitude. \texttt{check\_butterfly\_arbitrage} iterates over each maturity slice, computes total variance $w=v^2\tau$ across the $z$ direction, and flags any middle grid point where $w$ exceeds the chord value between its two neighbours by more than a tolerance $\varepsilon=10^{-6}$. \texttt{check\_calendar\_arbitrage} iterates over each fixed-$z$ column and flags any consecutive maturity pair where $w$ decreases.
+
+\texttt{project\_to\_arbitrage\_free} runs an alternating projection loop. Each iteration performs two passes in order: (1) the butterfly pass iterates over each maturity slice and, for each violating middle grid point, moves $w$ part-way towards the chord value by a step size $\eta=0.8$; (2) the calendar pass iterates over each fixed-$z$ column and, for each violating consecutive pair, replaces both values with their average. After each pass, total variance is converted back to implied volatility via $v=\sqrt{w/\tau}$. The loop terminates when the L2 norm of the surface change between successive iterations falls below $\varepsilon$, or after a maximum of 500 iterations. If the input surface already satisfies both discrete checks, the function returns immediately without iterating.
+
+The lower and upper band surfaces are projected independently. Their corrected grid values are then mapped back to the original scattered $(\rho,z)$ coordinates via a second \texttt{scipy.interpolate.griddata} call, with any points outside the grid convex hull filled from the corresponding pre-projection band values. The resulting scattered values form the final $\tilde{v}_{\text{lo}}$ and $\tilde{v}_{\text{hi}}$ used for coverage and band-width evaluation in Chapter~\ref{chap:results}. Lower--upper crossings are counted after projection as an additional consistency check.
+\section{Data Acquisition and Preprocessing}
+\label{sec:impl_data}
+
+The SPX option chains used in the empirical study were collected through the OpenBB Python interface using its Cboe provider and the symbol \texttt{SPX} \cite{openbb2026options}. A scheduled retrieval script requested the available option chain and saved the returned expiration dates, strikes, option types, bid prices, and ask prices as CSV files. The files were written in the column format expected by the existing \texttt{WRDSOptionsDataset} loader. The name of this loader therefore refers to the compatible file schema and does not imply that the observations were obtained from WRDS.
+
+During this transformation, the calendar date on which the retrieval completed was stored in the \texttt{date} field. The dates used to order the surfaces in the notebook and figures are consequently collection dates rather than separate exchange-provided quote timestamps. The \texttt{am\_settlement} field was set to one as a compatibility field required by the loader's filtering step; it is not used in this thesis as an empirical classification of the settlement convention of each individual contract. After loading, the existing preprocessing pipeline computes the time to maturity, forward price, discount factor, log-moneyness, and implied volatility and restricts the observations to the transformed GNO domain.
+
+\section{Experiment Notebook}
+\label{sec:impl_notebook}
+
+The experiment notebook \texttt{conformal\_prediction.ipynb} is the authoritative integration point for the reported pipeline. It loads the pre-trained GNO checkpoint and the WRDS-compatible OpenBB files via \texttt{WRDSOptionsDataset} and \texttt{GNOOptionsDataset}, and splits the available surfaces into a calibration set of 15 surfaces and a test set of 41 surfaces. The key hyperparameters used throughout the experiments are listed in Table~\ref{tab:hyperparams}.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Hyperparameter} & \textbf{Symbol} & \textbf{Value} \\
+\hline
+Coverage level          & $1 - \alpha$    & $90\%$ \\
+\hline
+Rolling window size     & $K$             & $5$ surfaces \\
+\hline
+Mondrian bins           & $B_\rho \times B_z$ & $4 \times 4$ \\
+\hline
+Shrinkage factor        & $\lambda$       & $0.3$ \\
+\hline
+Min samples per bin     &                 & $10$ \\
+\hline
+Projection step size    & $\eta$          & $0.8$ \\
+\hline
+Max projection iterations &               & $500$ \\
+\hline
+\end{tabular}
+\caption{Hyperparameters used in all experiments.}
+\label{tab:hyperparams}
+\end{table}
+
+The pipeline is encapsulated in a \texttt{run\_conformal\_pipeline} function that accepts a \texttt{score\_type} argument (\texttt{'vega'} for Score B or \texttt{'spread'} for Score A) and runs the full calibration and test loop for that score. During calibration, the function iterates over the 15 calibration surfaces in order: for each surface, it runs the GNO forward pass, computes nonconformity scores, adds them to the rolling window, and immediately recalibrates the global and Mondrian quantiles on the updated window. During testing, it iterates over the 41 test surfaces: for each, it runs the GNO forward pass, retrieves both global and per-point Mondrian quantiles, constructs both variants of the prediction bands, applies the no-arbitrage projection inline, and records coverage, band width, calendar and butterfly violation counts before and after projection, lower--upper crossings, and point-prediction errors. After each test surface is evaluated, its scores are added to the rolling window so that the calibration set continues to slide forward through time. The function is called once for each score, and the results are compared in Chapter~\ref{chap:results}.
+
+Figure~\ref{fig:dataset_overview} illustrates the structure of the dataset used throughout all experiments. The top panel shows the number of option quotes per surface across all 56 successfully collected surfaces, with calibration surfaces (indices 0--14) shaded in blue and test surfaces (indices 15--55) in red; the bottom panel displays the timeline of collection dates with the rolling window annotation. The collection dates span 11 December 2025 to 15 August 2026, and each processed surface contains between 8,677 and 11,325 quotes, with a mean of approximately 10,070. The calibration set covers collection dates from 11 December 2025 to 23 January 2026, and the test set covers collection dates from 29 January 2026 to 15 August 2026.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{Figures/fig_dataset_overview.png}
+    \caption{SPX options dataset: option quote count per surface (top) and collection timeline (bottom) across 56 successfully collected surfaces from December 2025 to August 2026. Blue indicates calibration surfaces (indices 0--14); red indicates test surfaces (indices 15--55).}
+    \label{fig:dataset_overview}
+\end{figure}
