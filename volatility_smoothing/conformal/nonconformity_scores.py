@@ -143,27 +143,11 @@ def compute_scores_from_data(
         )
         price_pred = is_call * price_pred_calls + (1 - is_call) * price_pred_puts
 
-        # Bid/ask prices (from IV)
-        iv_bid = data['bid'].cpu().numpy()
-        iv_ask = data['ask'].cpu().numpy()
-
-        d1_bid, d2_bid = compute_d1_d2(z, iv_bid, sqrt_tau)
-        bid_calls = discount * forward * (
-            norm.cdf(d1_bid) - np.exp(k) * norm.cdf(d2_bid)
-        )
-        bid_puts = discount * forward * (
-            np.exp(k) * norm.cdf(-d2_bid) - norm.cdf(-d1_bid)
-        )
-        bid = is_call * bid_calls + (1 - is_call) * bid_puts
-
-        d1_ask, d2_ask = compute_d1_d2(z, iv_ask, sqrt_tau)
-        ask_calls = discount * forward * (
-            norm.cdf(d1_ask) - np.exp(k) * norm.cdf(d2_ask)
-        )
-        ask_puts = discount * forward * (
-            np.exp(k) * norm.cdf(-d2_ask) - norm.cdf(-d1_ask)
-        )
-        ask = is_call * ask_calls + (1 - is_call) * ask_puts
+        # data['bid']/data['ask'] are already option prices (see
+        # OptionsDataset.load_data docstring), not implied volatilities —
+        # do not run them through compute_d1_d2.
+        bid = data['bid'].cpu().numpy()
+        ask = data['ask'].cpu().numpy()
 
         aux_data = {
             'price_pred': price_pred,
