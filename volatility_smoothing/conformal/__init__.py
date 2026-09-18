@@ -11,6 +11,8 @@ from .no_arbitrage_projection import (
     ArbitrageConstraints,
     check_butterfly_arbitrage,
     check_calendar_arbitrage,
+    check_calendar_arbitrage_fixed_k,
+    project_band_surfaces_fixed_k,
     project_to_arbitrage_free
 )
 
@@ -24,6 +26,8 @@ __all__ = [
     'ArbitrageConstraints',
     'check_butterfly_arbitrage',
     'check_calendar_arbitrage',
+    'check_calendar_arbitrage_fixed_k',
+    'project_band_surfaces_fixed_k',
     'project_to_arbitrage_free',
 ]
 

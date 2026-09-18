@@ -2,7 +2,7 @@
 Nonconformity score implementations for conformal prediction.
 
 Score A: Spread-normalized price error
-Score B: Vega-normalized IV error
+Score B: Vega-weighted IV error
 """
 
 import numpy as np
@@ -64,9 +64,11 @@ class SpreadNormalizedScore(NonconformityScore):
 
 class VegaNormalizedScore(NonconformityScore):
     """
-    Score B: Vega-normalized IV error.
+    Score B: Vega-weighted IV error.
 
-    Weights IV errors by Vega, emphasizing ATM options over OTM.
+    Per exposé Equation (2), calibration scores evaluate Vega at the
+    observed market IV. This is distinct from Equation (6), where a new
+    prediction band's weight is evaluated at the GNO estimate.
     """
 
     def __init__(self, min_weight: float = 1.0):
@@ -76,6 +78,7 @@ class VegaNormalizedScore(NonconformityScore):
                 iv_pred: np.ndarray,
                 iv_market: np.ndarray,
                 aux_data: Dict) -> np.ndarray:
+        # Exposé Eq. (2): w_V(x; v_t), with v_t the observed market surface.
         vega = aux_data['vega_market']
 
         mean_vega = vega.mean()

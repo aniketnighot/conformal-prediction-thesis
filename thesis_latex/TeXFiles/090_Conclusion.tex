@@ -1,4 +1,30 @@
 \chapter{Conclusion}
 \label{chap:conclusion}
 
-% To be written
+\section{Summary of the Study}
+
+This thesis addressed the absence of calibrated uncertainty information around implied volatility surfaces produced by a deterministic Graph Neural Operator. The pre-trained GNO provides a smooth estimate from an irregular set of option quotes, but it returns a point prediction rather than a range describing the uncertainty around that estimate. The contribution of this work is a post-hoc conformal framework that constructs lower and upper surfaces without changing the GNO architecture or retraining its parameters.
+
+The framework combines the main methodological components examined throughout the thesis. A coordinate-stratified mask separates each retained option surface into context observations and held-out targets for calibration and evaluation. Score A measures a price residual relative to the observed bid--ask spread, while Score B applies a Vega-based weight to the implied volatility residual. Exact conformal order statistics are computed from a rolling window, and Mondrian binning provides spatially varying thresholds. The resulting bands can be represented in both price and implied volatility space. Finally, the lower and upper surfaces are adjusted jointly to enforce the calendar condition, the discrete butterfly condition based on neighbouring grid points, positivity, and lower--upper ordering on the projection grid.
+
+The empirical study used a curated sequence of stored SPX option surfaces. Files collected outside regular trading sessions were excluded, and the retained surfaces were divided into an initial calibration period and a chronological walk-forward evaluation. At each step, only preceding surfaces were available for calibration; the current surface entered the window after its evaluation. Score A and Score B therefore used the same GNO predictions, context-target masks, and evaluation sequence.
+
+\section{Main Findings}
+
+The rolling calibration behaved as intended: its threshold changed as surfaces entered and left the window. The Mondrian thresholds also varied across the option domain, showing that the implementation responds to both recent prediction errors and spatial differences in those errors.
+
+For Score B, Mondrian calibration achieved higher mean coverage than the global construction and exceeded the nominal target on average. It also corrected several surface-level shortfalls, although it did not improve every evaluation surface. The lowest-moneyness region remained the most difficult part of the domain, showing that spatial calibration reduced but did not remove regional differences in coverage.
+
+The Score B bands remained comparatively narrow, and the projection changed their average width only slightly. The observed coverage was therefore not obtained through a large expansion of the bands during the financial-shape adjustment.
+
+The matched comparison between the two nonconformity scores favoured Score B. The spread-normalised price construction produced wider bands, lower coverage, and greater variation between surfaces. The Vega-weighted IV construction therefore provided the stronger combination of empirical coverage, sharpness, and stability in this experiment.
+
+The projection achieved its stated finite-grid objective for both scores by eliminating all observed violations of the enforced calendar and discrete butterfly conditions. No lower--upper crossings were observed at the evaluated target quotes after projection. A separate GNO-style butterfly diagnostic, which was not imposed as a constraint, still detected violations. The result therefore shows that the implemented discrete conditions were enforced successfully, but it does not establish that every static-arbitrage condition holds over the continuous domain.
+
+\section{Overall Conclusion}
+
+The research objectives were met at the level of implementation and empirical evaluation. Two economically motivated nonconformity scores were constructed, rolling calibration and Mondrian spatial binning were integrated with a pre-trained GNO, bands were obtained in price and implied volatility space, and the lower and upper surfaces were subjected to joint calendar and discrete butterfly adjustments. The walk-forward results show that the choice of score is consequential. For the observed SPX sample, Score B is the preferred construction because it achieved mean coverage above the nominal level with narrower bands and less variation across surfaces than Score A. Mondrian calibration improved average coverage relative to one global threshold, although the remaining regional and temporal shortfalls show that spatial binning does not remove every source of miscalibration.
+
+These findings are limited to one underlying, one GNO checkpoint, a relatively short and irregular evaluation sequence, and one fixed context-target mask. The rolling window makes calibration responsive to recent observations but does not restore the exchangeability required for the standard conformal guarantee. The sensitivity analysis used a short development period and one-at-a-time parameter changes, while the projection conclusions apply only to the implemented grid conditions. A broader assessment should use longer and more varied datasets, multiple trained checkpoints and masks, adaptive or weighted conformal methods, time-aware resampling, and finer projection grids. The supplementary GNO-style butterfly diagnostic could also be incorporated directly into the projection and compared with the current discrete condition.
+
+Within these limits, the study shows that conformal prediction can be added to a neural-operator volatility smoother as a practical uncertainty layer without retraining the underlying model. The resulting surfaces retain the computational advantage of a fixed GNO while attaching empirically evaluated ranges to its point estimates. On the available sample, Vega-weighted conformal calibration produced informative spatially varying bands, coverage above the nominal target on average, and only a small change in width from the financial-shape projection.

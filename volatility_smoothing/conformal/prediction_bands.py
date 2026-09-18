@@ -126,7 +126,8 @@ def implied_volatility_from_price(price: np.ndarray,
                                    discount: np.ndarray,
                                    forward: np.ndarray,
                                    iv_min: float = 1e-4,
-                                   iv_max: float = 5.0) -> np.ndarray:
+                                   iv_max: float = 5.0,
+                                   return_diagnostics: bool = False):
     """
     Invert black_scholes_price for implied volatility (Eq. 5: v = IV(x, P)).
 
@@ -150,6 +151,10 @@ def implied_volatility_from_price(price: np.ndarray,
         Points where no sign change is found within [iv_min, iv_max]
         (price outside the model's attainable range) are clipped to the
         nearest bound rather than raising.
+    diagnostics : dict, optional
+        Returned with ``iv`` when ``return_diagnostics=True``. It records
+        successful inversions, clips to either volatility bound, solver
+        failures, and negative or non-finite price endpoints.
     """
     price = np.atleast_1d(np.asarray(price, dtype=float))
     z = np.atleast_1d(np.asarray(z, dtype=float))
@@ -159,11 +164,21 @@ def implied_volatility_from_price(price: np.ndarray,
 
     n = price.shape[0]
     iv = np.full(n, np.nan)
+    status = np.full(n, "success", dtype=object)
+    negative_price = price < 0
+    nonfinite_price = ~np.isfinite(price)
 
     for i in range(n):
         z_i, sqrt_tau_i, discount_i, forward_i, price_i = (
             z[i], sqrt_tau[i], discount[i], forward[i], price[i]
         )
+
+        if not np.all(np.isfinite(
+            [z_i, sqrt_tau_i, discount_i, forward_i, price_i]
+        )):
+            iv[i] = iv_min
+            status[i] = "solver_failure"
+            continue
 
         def f(vol, z_i=z_i, sqrt_tau_i=sqrt_tau_i, discount_i=discount_i,
               forward_i=forward_i, price_i=price_i):
@@ -175,12 +190,41 @@ def implied_volatility_from_price(price: np.ndarray,
         f_lo, f_hi = f(iv_min), f(iv_max)
         if f_lo > 0:
             iv[i] = iv_min
+            status[i] = "clipped_min"
         elif f_hi < 0:
             iv[i] = iv_max
+            status[i] = "clipped_max"
         else:
-            iv[i] = brentq(f, iv_min, iv_max, xtol=1e-8, maxiter=100)
+            try:
+                iv[i] = brentq(f, iv_min, iv_max, xtol=1e-8, maxiter=100)
+            except (ValueError, RuntimeError, OverflowError, FloatingPointError):
+                # Retain a finite band endpoint even if the numerical solver
+                # fails, and report the event separately.
+                iv[i] = iv_min if abs(f_lo) <= abs(f_hi) else iv_max
+                status[i] = "solver_failure"
 
-    return iv
+    if not return_diagnostics:
+        return iv
+
+    n_classified = sum(
+        int(np.sum(status == label))
+        for label in ("success", "clipped_min", "clipped_max", "solver_failure")
+    )
+    if n_classified != n:
+        raise AssertionError("each IV inversion must have exactly one numerical status")
+
+    diagnostics = {
+        "n_total": int(n),
+        "successful_inversions": int(np.sum(status == "success")),
+        "clipped_min": int(np.sum(status == "clipped_min")),
+        "clipped_max": int(np.sum(status == "clipped_max")),
+        "solver_failures": int(np.sum(status == "solver_failure")),
+        "negative_price_endpoints": int(np.sum(negative_price)),
+        "nonfinite_price_endpoints": int(np.sum(nonfinite_price)),
+        "iv_min": float(iv_min),
+        "iv_max": float(iv_max),
+    }
+    return iv, diagnostics
 
 
 class PredictionBands:
@@ -271,15 +315,27 @@ class PredictionBands:
             price_upper = price_pred + delta_price
 
             # Eq. 5: v_lo(x) = IV(x, P_lo(x)), v_hi(x) = IV(x, P_hi(x))
-            iv_lower = implied_volatility_from_price(
-                price_lower, z, sqrt_tau, discount, forward)
-            iv_upper = implied_volatility_from_price(
-                price_upper, z, sqrt_tau, discount, forward)
+            iv_lower, lower_diagnostics = implied_volatility_from_price(
+                price_lower, z, sqrt_tau, discount, forward,
+                return_diagnostics=True)
+            iv_upper, upper_diagnostics = implied_volatility_from_price(
+                price_upper, z, sqrt_tau, discount, forward,
+                return_diagnostics=True)
 
-        return {
+            numerical_diagnostics = {
+                "lower": lower_diagnostics,
+                "upper": upper_diagnostics,
+                "spreads_floored": int(np.sum(spread < self.min_spread)),
+                "min_spread": float(self.min_spread),
+            }
+
+        result = {
             "iv_lower": iv_lower,
             "iv_upper": iv_upper,
             "price_lower": price_lower,
             "price_upper": price_upper,
             "mode": self.mode
         }
+        if self.mode == "price_spread":
+            result["numerical_diagnostics"] = numerical_diagnostics
+        return result

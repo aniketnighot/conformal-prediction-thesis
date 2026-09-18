@@ -24,8 +24,6 @@
   paper=a4,
     %letterpaper
     %a4paper,
-  ngerman,
-  american,
     %table
   ]
 % Dokumententyp: (legt grundlegende Formatierrichtlinien fest)
@@ -62,7 +60,7 @@
 
 %%%%% package Sprachunterstuetzung:
 
-\usepackage{babel}[ngerman]
+\usepackage[ngerman,british]{babel}
 \usepackage{csquotes}
 
 %%%%% Package Multirow ermoeglicht, dass sich ein Kaestchen in einer Tabelle ueber mehrere Zeilen erstrecken kann:
@@ -291,9 +289,9 @@
 %nicht so
 
 \ifdefined\ThesisLanguageIsEnglish
-\selectlanguage{american}
+\selectlanguage{british}
 \else
-\selectlanguage{ngerman} % ngerman, american
+\selectlanguage{ngerman} % ngerman, british
 \fi
 %Deutsch nach neuer Rechtschreibung als
 %Standardsprache fuer das Dokument einstellen
