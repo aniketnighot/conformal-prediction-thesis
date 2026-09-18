@@ -58,7 +58,7 @@ Not every smooth surface defined over the strike--expiry domain corresponds to a
     \item \textbf{No-butterfly-arbitrage:} At each fixed maturity, the corresponding call-option prices must be convex in strike. In implied-volatility terms, this is expressed through a condition involving the smile and its strike derivatives and ensures that the associated risk-neutral density remains non-negative \cite{gonon2024operator}.
 \end{itemize}
 
-These conditions provide the financial basis for the post-processing routine used in this thesis. On a regular grid, the routine applies the corresponding discrete calendar and butterfly conditions to the lower and upper band surfaces. The analytic conditions and their implementation are discussed in Chapter~\ref{chap:methodology}.
+These conditions provide the financial basis for the post-processing routine used in this thesis. On a regular grid, the routine applies the calendar condition and the discrete butterfly condition based on neighbouring grid points to the lower and upper band surfaces. The analytic conditions and their implementation are discussed in Chapter~\ref{chap:methodology}.
 
 \section{Implied Volatility Smoothing}
 \label{sec:iv_smoothing}
@@ -79,7 +79,7 @@ The limitations of parametric calibration have motivated a growing body of resea
 
 A related line of work applies variational autoencoders to volatility smoothing \cite{bergeron2022variational}, exploiting the fixed-grid structure of FX options markets where strikes are quoted at standard deltas. As noted by Gonon et al.\ \cite{gonon2024operator}, this specificity limits direct application to equity index options such as SPX, where the set of available strikes and maturities changes continuously as contracts expire and new ones are listed.
 
-A further limitation of classical neural network architectures in this setting is the requirement for fixed-size inputs \cite{gonon2024operator}. Options data is inherently irregular: at each point in time, a different collection of strikes and maturities is available. Applying standard feedforward or convolutional networks therefore requires additional preprocessing and a fixed representation of the changing market data.
+A further limitation of classical neural network architectures in this setting is the requirement for fixed-size inputs \cite{gonon2024operator}. Options data are inherently irregular: at each point in time, a different collection of strikes and maturities is available. Applying standard feedforward or convolutional networks therefore requires additional preprocessing and a fixed representation of the changing market data.
 
 \subsection{Operator Deep Smoothing}
 \label{subsec:ops}
@@ -142,7 +142,7 @@ The choice of nonconformity score determines the shape and adaptivity of the res
 \subsection{Mondrian Conformal Prediction}
 \label{subsec:mondrian}
 
-Mondrian conformal prediction \cite{shafer2008tutorial, angelopoulos2023gentle} extends the basic framework toward group-conditional coverage by partitioning the input space into disjoint bins and computing a separate conformal quantile within each bin. Under exchangeability, the unmodified Mondrian construction provides marginal coverage conditional on membership in a predefined bin. This is particularly relevant for implied volatility surfaces, where uncertainty varies systematically with liquidity across the strike-expiry domain. In this thesis, spatial binning is used primarily to create adaptive band widths across the surface, and its coverage behaviour is assessed empirically.
+Mondrian conformal prediction \cite{shafer2008tutorial, angelopoulos2023gentle} extends the basic framework towards group-conditional coverage by partitioning the input space into disjoint bins and computing a separate conformal quantile within each bin. Under exchangeability, the unmodified Mondrian construction provides marginal coverage conditional on membership in a predefined bin. This is particularly relevant for implied volatility surfaces, where uncertainty varies systematically with liquidity across the strike-expiry domain. In this thesis, spatial binning is used primarily to create adaptive band widths across the surface, and its coverage behaviour is assessed empirically.
 
 \subsection{Conformal Prediction for Time Series}
 \label{subsec:cp_timeseries}

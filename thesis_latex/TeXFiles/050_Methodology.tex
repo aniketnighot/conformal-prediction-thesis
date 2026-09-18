@@ -15,7 +15,16 @@ Two market quantities are used to define the nonconformity scores. Let $\text{BS
 \end{equation}
 where $D_{t,T}$ and $F_{t,T}$ are the discount factor and forward price for the relevant maturity. The spread $s_t(x)$ is the observed ask price minus the bid price in the same units as $P_{t,\pm}$. Score B uses the forward-normalised Vega $\mathcal{V}(x,v)=\varphi(d_1(x,v))\rho$. These quantities are built from the Black--Scholes terms introduced in Section~\ref{subsec:bs}, evaluated at $\tau=\rho^2$ and $k=\rho z$.
 
-The framework operates on a temporal sequence of market snapshots. At each time $t$, a finite set of quote locations $\pi_t\subset D$ is observed together with the corresponding market implied volatilities $v_t(x)$ for $x\in\pi_t$. The GNO estimate is evaluated at these locations for calibration and empirical coverage measurement, and the constructed bands are represented over a regular grid when the complete lower and upper surfaces are projected. For a new snapshot at time $t^\star$, the objective is to construct surfaces $v_{\text{lo}}:D\rightarrow(0,\infty)$ and $v_{\text{hi}}:D\rightarrow(0,\infty)$ around the GNO estimate, with target marginal coverage $1-\alpha$ and the calendar and butterfly adjustments described in Section~\ref{sec:meth_arbitrage}.
+The framework operates on a temporal sequence of market snapshots. At each time $t$, a finite set of quote locations $\pi_t\subset D$ is observed together with the corresponding market implied volatilities $v_t(x)$ for $x\in\pi_t$. For the experiment, this set is divided into disjoint context and target sets,
+\begin{equation}
+    \pi_t=\mathcal{C}_t\mathbin{\dot\cup}\mathcal{T}_t,
+    \qquad |\mathcal{C}_t|\approx0.8|\pi_t|,
+    \qquad |\mathcal{T}_t|\approx0.2|\pi_t|.
+    \label{eq:context_target_partition}
+\end{equation}
+The split is made separately within each cell of a $4\times4$ partition of the $(\rho,z)$ domain. It depends only on the quote coordinates and uses base seed 2026 together with the surface index, making the split fixed and reproducible for each surface. Approximately 20\% of the points in every populated cell are assigned to the target set; a cell containing only one point is kept in the context set.
+
+Only the locations and implied volatilities in $\mathcal{C}_t$ are supplied as observations to the GNO. The coordinates in $\mathcal{T}_t$ are included as query locations, but their implied volatilities are withheld from the model. After the GNO has produced predictions at these locations, the withheld values are used to calculate nonconformity scores and evaluation metrics. The same split is used for Score A and Score B. The target-level bands are subsequently represented on a regular grid when the complete lower and upper surfaces are projected. For a new snapshot at time $t^\star$, the objective is to construct surfaces $v_{\text{lo}}:D\rightarrow(0,\infty)$ and $v_{\text{hi}}:D\rightarrow(0,\infty)$ around the GNO estimate, with target marginal coverage $1-\alpha$ and the calendar and discrete butterfly adjustments described in Section~\ref{sec:meth_arbitrage}.
 
 \section{Nonconformity Scores}
 \label{sec:meth_scores}
@@ -32,44 +41,46 @@ The first score normalises the price residual by the prevailing bid-ask spread, 
     \qquad
     r^P_t(x)
     = P_{t,\pm}\big(x,\hat{v}_t(x)\big)
-    - P_{t,\pm}\big(x,v_t(x)\big).
+    - P_{t,\pm}\big(x,v_t(x)\big),
+    \qquad x\in\mathcal{T}_t.
     \label{eq:score_a}
 \end{equation}
 This construction adapts the spread-relative pricing error used by Gonon et al.\ \cite{gonon2024operator} for conformal calibration. Here, $P_{t,\pm}$ is the option price defined in Equation~\ref{eq:implemented_option_price}, and $s_t(x)$ is measured in the same option-price units. The floor of $0.10$ avoids unstable normalisation when the recorded spread is very small or zero. When the market reference price is the bid-ask midpoint and the floor is inactive, a score of 1 corresponds to an error of half the observed spread, while a score below 1 places the model price within the quoted interval.
 
-\subsection{Score B: Vega-Normalised Implied Volatility Error}
+\subsection{Score B: Vega-Weighted Implied Volatility Error}
 \label{subsec:score_b}
 
-The second score operates directly in implied volatility space and weights the residual by the option's forward-normalised Vega. Options with above-average Vega therefore receive greater weight:
+The second score operates directly in implied volatility space and multiplies the residual by a weight derived from the option's forward-normalised Vega. Options with above-average Vega therefore receive greater weight:
 \begin{equation}
     A^{\text{IV}}_t(x)
-    = w_V(x;\hat{v}_t)\,\big|r^{\text{IV}}_t(x)\big|,
+    = w_V(x;v_t)\,\big|r^{\text{IV}}_t(x)\big|,
     \qquad
     r^{\text{IV}}_t(x)=\hat{v}_t(x)-v_t(x),
+    \qquad x\in\mathcal{T}_t,
     \label{eq:score_b}
 \end{equation}
 where the implemented weight is
 \begin{equation}
-    w_V(x;\hat{v}_t)
+    w_V(x;v_t)
     = \max\!\left\{
-        \frac{\mathcal{V}\big(x,\hat{v}_t(x)\big)}
-        {\frac{1}{|\pi_t|}\sum_{x'\in\pi_t}
-        \mathcal{V}\big(x',\hat{v}_t(x')\big)},
+        \frac{\mathcal{V}\big(x,v_t(x)\big)}
+        {\frac{1}{|\mathcal{T}_t|}\sum_{x'\in\mathcal{T}_t}
+        \mathcal{V}\big(x',v_t(x')\big)},
         1
       \right\}.
     \label{eq:score_b_weight}
 \end{equation}
-The surface-normalised Vega weighting follows Gonon et al.\ \cite{gonon2024operator}. The Vega is evaluated at the GNO estimate, and the same definition is used during calibration and band construction. Normalising by the mean Vega preserves relative sensitivity across each surface: options above the mean receive a weight greater than 1, while the floor keeps the remaining residuals on their original scale.
+For calibration, Vega is evaluated at the observed market implied volatility and rescaled by its mean over the target set of the surface. Options above the target-set mean receive a weight greater than 1, while the floor keeps the remaining residuals on their original scale. At prediction time the target implied volatility is unknown, so the Vega-IV band uses the separate plug-in weight evaluated at the GNO estimate, as defined in Equation~\ref{eq:iv_band_halfwidth} below.
 
 \section{Rolling Window Calibration and Mondrian Binning}
 \label{sec:meth_calibration}
 
-Financial markets are non-stationary: the distribution of prediction errors observed in one period need not remain unchanged in another. The framework therefore restricts calibration to the $K$ most recently processed market surfaces rather than using the complete history. Let the available snapshots be ordered by time as $t_1<t_2<\cdots$. For an evaluation at $t_j$, the window $W_j$ contains up to the $K$ most recent available snapshots preceding $t_j$. The window counts observed surfaces rather than elapsed calendar days, so gaps between data-collection dates do not alter its definition.
+Financial markets are non-stationary: the distribution of prediction errors observed in one period need not remain unchanged in another. Let $L$ denote the maximum number of surfaces in the rolling window. The framework restricts calibration to the $L$ most recently processed market surfaces rather than using the complete history. Let the available snapshots be ordered by time as $t_1<t_2<\cdots$. For an evaluation at $t_j$, the window $W_j$ contains up to the $L$ most recent available snapshots preceding $t_j$. The window counts observed surfaces rather than elapsed calendar days, so gaps between data-collection dates do not alter its definition.
 
-The scores from all quotes on the surfaces in $W_j$ are pooled into
+The target scores from the surfaces in $W_j$ are pooled into
 \begin{equation}
     \mathcal{A}(W_j)
-    = \{A_t(x):t\in W_j,\ x\in\pi_t\}.
+    = \{A_t(x):t\in W_j,\ x\in\mathcal{T}_t\}.
 \end{equation}
 If $n=|\mathcal{A}(W_j)|$ and $A_{(1)}\leq\cdots\leq A_{(n)}$ denote the ordered pooled scores, the implementation uses the exact conformal order statistic
 \begin{equation}
@@ -78,7 +89,7 @@ If $n=|\mathcal{A}(W_j)|$ and $A_{(1)}\leq\cdots\leq A_{(n)}$ denote the ordered
     r_n=\min\!\left\{n,\left\lceil(n+1)(1-\alpha)\right\rceil\right\}.
     \label{eq:quantile}
 \end{equation}
-Under exchangeability, this is the standard finite-sample quantile used to obtain marginal coverage at level $1-\alpha$ \cite{shafer2008tutorial,angelopoulos2023gentle}. In the walk-forward evaluation, each new surface is evaluated using only the preceding window and is added to the window afterwards, allowing it to contribute to subsequent predictions without using future information.
+Under exchangeability, this is the standard finite-sample quantile used to obtain marginal coverage at level $1-\alpha$ \cite{shafer2008tutorial,angelopoulos2023gentle}. In the walk-forward evaluation, the target points on each new surface are evaluated using only the preceding window. Their scores are added to the window afterwards, allowing the surface to contribute to subsequent predictions without calibrating its own bands.
 
 A single quantile computed over the entire domain $D$ does not reflect possible variation in the score distribution across maturities and moneyness levels. To introduce spatial adaptation, the framework applies \textit{Mondrian conformal prediction} \cite{vovk2005algorithmic,shafer2008tutorial}: the domain is partitioned into a regular grid of $B_\rho\times B_z$ bins, and Equation~\ref{eq:quantile} is applied separately to the scores in each sufficiently populated bin. An evaluation point receives the quantile of the bin containing its $(\rho,z)$ coordinates.
 
@@ -87,12 +98,12 @@ Because each bin contains fewer scores than the pooled calibration set, two stab
     q_{\text{bin}} = \lambda\, \hat{q}_{1-\alpha} + (1-\lambda)\, q^{\text{raw}}_{\text{bin}}.
     \label{eq:shrinkage}
 \end{equation}
-The experiments use $K=5$ surfaces, a $4\times4$ partition, and $\lambda=0.3$. This shrinkage is an empirical regularisation that reduces unstable differences between bin estimates and the global value; the coverage of the resulting spatially adaptive bands is therefore evaluated empirically. Points outside the bounds of $D$ are assigned the global quantile.
+The experiments use $L=5$ surfaces, a $4\times4$ partition, and $\lambda=0.3$. This shrinkage is an empirical regularisation that reduces unstable differences between bin estimates and the global value; the coverage of the resulting spatially adaptive bands is therefore evaluated empirically. Points outside the bounds of $D$ are assigned the global quantile.
 
 \section{Prediction Bands}
 \label{sec:meth_bands}
 
-At a new prediction time $t^\star$, the GNO evaluates $\hat{v}_{t^\star}(x)$ at the observed quote locations $\pi_{t^\star}$. Each location is assigned the corresponding global or Mondrian conformal quantile. Two modes of constructing prediction bands around $\hat{v}_{t^\star}(x)$ are considered, corresponding to the two nonconformity scores of Section~\ref{sec:meth_scores}. The resulting quote-level bounds are subsequently represented on a regular grid for the surface projection described in Section~\ref{sec:meth_arbitrage}.
+At a new prediction time $t^\star$, the context observations are supplied to the GNO and it evaluates $\hat{v}_{t^\star}(x)$ at the held-out target coordinates $x\in\mathcal{T}_{t^\star}$. Each target location is assigned the corresponding global or Mondrian conformal quantile. Two modes of constructing prediction bands around $\hat{v}_{t^\star}(x)$ are considered, corresponding to the two nonconformity scores of Section~\ref{sec:meth_scores}. The resulting target-level bounds are subsequently represented on a regular grid for the surface projection described in Section~\ref{sec:meth_arbitrage}.
 
 \subsection{Price-Spread Mode}
 \label{subsec:price_spread_mode}
@@ -131,7 +142,7 @@ where $10^{-4}$ is the numerical floor used in the implementation to keep the lo
 \section{No-Arbitrage Projection}
 \label{sec:meth_arbitrage}
 
-The prediction bands constructed in Section~\ref{sec:meth_bands} are designed to provide statistical coverage around the GNO surface. Their construction does not directly impose the financial shape conditions introduced in Section~\ref{subsec:no_arbitrage}. A post-processing step is therefore applied to improve the calendar and butterfly consistency of the lower and upper band surfaces. This section first summarises the corresponding conditions from the base GNO paper \cite{gonon2024operator} and then describes the discrete implementation used for the conformal bands.
+The prediction bands constructed in Section~\ref{sec:meth_bands} are designed to provide statistical coverage around the GNO surface. Their construction does not directly impose the financial shape conditions introduced in Section~\ref{subsec:no_arbitrage}. A post-processing step is therefore applied to improve the calendar and discrete butterfly consistency of the lower and upper band surfaces. This section first summarises the corresponding conditions from the base GNO paper \cite{gonon2024operator} and then describes the discrete implementation used for the conformal bands.
 
 \subsection{Calendar and Butterfly Constraints}
 \label{subsec:meth_calendar_butterfly}
@@ -160,26 +171,33 @@ Let $\hat{v} : (0,\infty) \times \mathbb{R} \to (0,\infty)$ be continuous and sa
 Then $(T, K) \mapsto \text{BS}(\tau, k, \hat{v}(\tau,k))$ defines a call price surface free of static arbitrage.
 \end{theorem}
 
-Condition (i) is the calendar spread condition already introduced in Section~\ref{subsec:no_arbitrage}: total uncertainty should not decrease as maturity increases at the same log-moneyness. Condition (ii) is the analytic butterfly condition, for which a non-negative $\text{But}$ functional corresponds to a non-negative risk-neutral density. The asymptotic condition concerns the behaviour of the surface outside the bounded domain used in this thesis and is therefore not part of the finite-grid post-processing step.
+Condition (i) is the calendar spread condition already introduced in Section~\ref{subsec:no_arbitrage}: total implied variance should not decrease as maturity increases at the same log-moneyness. Condition (ii) is the analytic butterfly condition, for which a non-negative $\text{But}$ functional corresponds to a non-negative risk-neutral density. The asymptotic condition concerns the behaviour of the surface outside the bounded domain used in this thesis and is therefore not part of the finite-grid post-processing step.
 
-The base paper incorporates the calendar and butterfly conditions during GNO training through the soft penalties $\mathcal{L}_{\text{cal}}$ and $\mathcal{L}_{\text{but}}$, numbered Equations~(11) and~(10), respectively, in that paper. The pre-trained GNO is not retrained in this thesis. Instead, the conformal lower and upper surfaces are adjusted after band construction using discrete calendar and butterfly conditions in total implied variance. These conditions are motivated by the same financial requirements while allowing a direct and stable implementation on the transformed grid.
+The base paper incorporates the calendar and butterfly conditions during GNO training through the soft penalties $\mathcal{L}_{\text{cal}}$ and $\mathcal{L}_{\text{but}}$, numbered Equations~(11) and~(10), respectively, in that paper. The pre-trained GNO is not retrained in this thesis. Instead, the conformal lower and upper surfaces are adjusted after band construction using a fixed-$k$ calendar condition and a discrete butterfly condition in total implied variance. These conditions are motivated by the same financial requirements while allowing a direct implementation on the transformed grid.
 
 \subsection{Projection Algorithm}
 \label{subsec:projection_algorithm}
 
-The projection is applied independently to the lower and upper band surfaces. Each iteration uses two consecutive passes: butterfly first and calendar second. The calculations are performed in terms of \emph{total implied variance}
+The lower and upper band surfaces are adjusted jointly. The calculations are performed in terms of \emph{total implied variance}
 \begin{equation}
     w(\rho,z):=v(\rho,z)^2\rho^2,
     \qquad \tau=\rho^2,\quad k=\rho z.
     \label{eq:total_variance_transformed}
 \end{equation}
-On the transformed grid, the calendar pass requires total implied variance to be non-decreasing between consecutive maturity coordinates at fixed $z$:
+For consecutive maturity coordinates $\rho_i<\rho_{i+1}$ and a grid point $z_j$ on the longer-maturity row, the point with the same log-moneyness $k$ on the shorter-maturity row is
 \begin{equation}
-    w(\rho_i,z)\leq w(\rho_{i+1},z),
-    \qquad \rho_i<\rho_{i+1}.
+    z_{i}^{(j)}=\frac{\rho_{i+1}}{\rho_i}z_j.
+    \label{eq:fixed_k_mapping}
+\end{equation}
+When $z_i^{(j)}$ lies inside the grid, the calendar condition requires
+\begin{equation}
+    w\!\left(\rho_i,z_i^{(j)}\right)
+    \leq w(\rho_{i+1},z_j).
     \label{eq:calendar_total_variance}
 \end{equation}
-The butterfly pass applies a chord condition across $z$ at each fixed maturity. For three consecutive grid points $z_1<z_2<z_3$,
+The shorter-maturity value is obtained by linear interpolation in $z$. This is the fixed-$k$ comparison used in the GNO paper because $\rho_i z_i^{(j)}=\rho_{i+1}z_j$. The implementation interpolates total variance, which gives a conservative discrete form of the corresponding positive total-volatility condition.
+
+The discrete butterfly condition compares three neighbouring $z$ points at each fixed maturity. The total variance at the middle point must not exceed the linearly interpolated value between the two outer points. For $z_1<z_2<z_3$,
 \begin{equation}
     w(\rho,z_2)\leq
     \frac{\Delta z_2\,w(\rho,z_1)+\Delta z_1\,w(\rho,z_3)}
@@ -188,71 +206,68 @@ The butterfly pass applies a chord condition across $z$ at each fixed maturity. 
     \Delta z_1=z_2-z_1,\quad \Delta z_2=z_3-z_2.
     \label{eq:butterfly_total_variance}
 \end{equation}
-At a fixed $\rho$, the transformation $k=\rho z$ is linear, so the ordering of points within a maturity slice is preserved. Equations~\ref{eq:calendar_total_variance} and~\ref{eq:butterfly_total_variance} are the calendar and butterfly conditions actually enforced by the post-processing routine.
+At a fixed $\rho$, the transformation $k=\rho z$ is linear, so the ordering of points within a maturity slice is preserved. Equations~\ref{eq:calendar_total_variance} and~\ref{eq:butterfly_total_variance} are, respectively, the fixed-$k$ calendar condition and the discrete butterfly condition enforced by the post-processing routine.
 
-The observed option quotes lie at irregular $(\rho,z)$ locations. For each evaluation surface, their band values are mapped by linear interpolation to a rectangular grid formed from the observed distinct $\rho$ values, rounded to four decimal places, and 50 equally spaced $z$ values. Nearest-neighbour interpolation fills grid locations outside the convex hull. The first pass then applies Equation~\ref{eq:butterfly_total_variance} to each maturity slice. If a middle point is above its chord value, its total variance is moved part-way towards that value:
+The held-out target quotes lie at irregular $(\rho,z)$ locations. For each evaluation surface, their band values are mapped by linear interpolation to a rectangular grid formed from the distinct target $\rho$ values, rounded to four decimal places, and 50 equally spaced $z$ values. Nearest-neighbour interpolation fills grid locations outside the convex hull. The adjusted grid values are obtained from one sparse linear program that minimises the total absolute change in both surfaces:
 \begin{equation}
-    w(\rho,z_2)\leftarrow w(\rho,z_2)
-    +\eta\big(w_{\text{chord}}-w(\rho,z_2)\big),
-    \qquad
-    w_{\text{chord}}=
-    \frac{\Delta z_2\,w(\rho,z_1)+\Delta z_1\,w(\rho,z_3)}
-    {\Delta z_1+\Delta z_2}.
-    \label{eq:butterfly_step}
+    \min_{\widetilde w_{\mathrm{lo}},\widetilde w_{\mathrm{hi}}}
+    \sum_{b\in\{\mathrm{lo},\mathrm{hi}\}}\sum_{i,j}
+    \left|\widetilde w_b(\rho_i,z_j)-w_b(\rho_i,z_j)\right|.
+    \label{eq:joint_projection_objective}
 \end{equation}
-The implementation uses $\eta=0.8$. The second pass applies Equation~\ref{eq:calendar_total_variance} down each fixed-$z$ column. If $w(\rho_i,z)>w(\rho_{i+1},z)+\varepsilon$, the two values are replaced by their average. After each pass, the corrected values are converted back to implied volatility using $v=\sqrt{w/\rho^2}$. The passes are repeated until the change between iterations is below the tolerance $\varepsilon=10^{-6}$ or 500 iterations have been completed. This is summarised in Algorithm~\ref{alg:conformal_pipeline}.
+The optimisation is subject to Equations~\ref{eq:calendar_total_variance} and~\ref{eq:butterfly_total_variance} for both surfaces, positivity, and the ordering constraint $\widetilde w_{\mathrm{lo}}\leq\widetilde w_{\mathrm{hi}}$ at every grid point. Absolute changes are represented with auxiliary variables, so the problem remains linear and is solved using the HiGHS solver. The corrected total variances are then converted back to implied volatility using $\widetilde v=\sqrt{\widetilde w/\rho^2}$. This is summarised in Algorithm~\ref{alg:conformal_pipeline}.
 
 \begin{algorithm}
 \caption{Conformal bands with no-arbitrage projection}
 \label{alg:conformal_pipeline}
 \begin{algorithmic}[1]
 \Require Trained GNO $\hat{F}^\theta$, rolling window $W$, spatial binning of $D$, tolerance $\varepsilon$, coverage level $1-\alpha$
-\State \textbf{Calibration:} compute nonconformity scores (Equation~\ref{eq:score_a} and/or Equation~\ref{eq:score_b}) in each bin; store the empirical quantile $\hat{q}_{1-\alpha}$ per Equation~\ref{eq:quantile}
-\State \textbf{Predict:} evaluate $\hat{v} = \hat{F}^\theta$ on the observed quotes; compute $v_{\text{lo}}, v_{\text{hi}}$ via the price-spread or Vega-IV mode
+\State split each surface into context set $\mathcal{C}_t$ and target set $\mathcal{T}_t$ using Equation~\ref{eq:context_target_partition}
+\State supply the context locations and IV values to the GNO; include the target coordinates as query locations without their IV values
+\State \textbf{Calibration:} compute target-set nonconformity scores (Equation~\ref{eq:score_a} and/or Equation~\ref{eq:score_b}) in each bin; store the empirical quantile $\hat{q}_{1-\alpha}$ per Equation~\ref{eq:quantile}
+\State \textbf{Predict:} evaluate $\hat{v} = \hat{F}^\theta$ at the target locations; compute $v_{\text{lo}}, v_{\text{hi}}$ via the price-spread or Vega-IV mode
 \State \textbf{Interpolate:} map both IV bands to the rectangular $(\rho,z)$ grid
-\For{each of $v_{\text{lo}}$ and $v_{\text{hi}}$}
-    \State apply the butterfly pass across $z$ at each maturity
-    \State apply the calendar pass across maturity at fixed $z$
-    \State repeat until convergence or the iteration limit
-\EndFor
-\State \textbf{Map back:} interpolate both projected surfaces to the observed quote locations
-\State \textbf{Check:} count remaining calendar and butterfly violations and lower--upper crossings
+\State construct the fixed-$k$ calendar constraints using Equation~\ref{eq:fixed_k_mapping}
+\State construct the discrete butterfly constraints from neighbouring $z$ points at each maturity
+\State jointly minimise Equation~\ref{eq:joint_projection_objective} subject to both shape conditions, positivity, and lower/upper ordering
+\State \textbf{Map back:} interpolate both projected surfaces to the target locations
+\State \textbf{Check:} count remaining fixed-$k$ calendar and discrete butterfly violations and lower/upper crossings at the target locations
 \State \Return projected IV bands $(\tilde{v}_{\text{lo}},\tilde{v}_{\text{hi}})$ and projection diagnostics
 \end{algorithmic}
 \end{algorithm}
 
-The projected grid values are mapped back to the observed quote locations by linear interpolation; if a mapped value is unavailable, the original band endpoint at that quote is retained. Because the lower and upper surfaces are projected independently, lower--upper crossings are checked both on the grid and after mapping back. Corresponding price endpoints can, when required, be recovered using the option-price function $P_{t^\star,\pm}$ defined in Equation~\eqref{eq:implemented_option_price}.
+The projected grid values are mapped back to the target locations by linear interpolation; if a mapped value is unavailable, the original band endpoint at that target is retained. The joint optimisation imposes lower/upper ordering directly on the grid, and crossings are also checked after mapping back. Corresponding price endpoints can, when required, be recovered using the option-price function $P_{t^\star,\pm}$ defined in Equation~\eqref{eq:implemented_option_price}.
 
 \subsection{Coverage after Projection}
 \label{subsec:coverage_projection}
 
-The direct conformal construction provides the bands before projection. Since the projection can adjust their endpoints, coverage after projection is evaluated empirically rather than inferred from the pre-projection statement. The evaluation therefore reports matched coverage before and after projection on the same test quotes, together with the remaining calendar and butterfly counts and the number of lower--upper crossings.
+The direct conformal construction provides the bands before projection. Since the projection can adjust their endpoints, coverage after projection is evaluated empirically rather than inferred from the pre-projection statement. The evaluation therefore reports matched coverage before and after projection on the same held-out target quotes, together with the remaining fixed-$k$ calendar and discrete butterfly counts and the number of lower--upper crossings.
 
 \section{Evaluation Metrics}
 \label{sec:meth_metrics}
 
 The framework is evaluated in walk-forward order. Each evaluation surface is assessed using only the preceding surfaces in the rolling calibration window and is added to the window afterwards. Consequently, an evaluation surface is never used to calibrate its own prediction bands.
 
-\textit{Coverage:} For an evaluation surface at $t^\star$, within-surface coverage is the fraction of observed market implied volatilities contained in the band:
+\textit{Coverage:} For an evaluation surface at $t^\star$, within-surface coverage is the fraction of held-out target implied volatilities contained in the band:
 \begin{equation}
     \widehat{\operatorname{Cov}}_{t^\star}
-    =\frac{1}{|\pi_{t^\star}|}
-    \sum_{x\in\pi_{t^\star}}
+    =\frac{1}{|\mathcal{T}_{t^\star}|}
+    \sum_{x\in\mathcal{T}_{t^\star}}
     \mathbf{1}\!\left\{v_{t^\star}(x)\in
     [v_{\text{lo}}(x),v_{\text{hi}}(x)]\right\}.
     \label{eq:empirical_coverage}
 \end{equation}
-It is compared with the nominal target $1-\alpha$. Coverage is computed separately for the global and Mondrian quantiles and, where relevant, before and after projection. The per-surface values are then summarised across the evaluation period.
+It is compared with the nominal target $1-\alpha$. Coverage is computed separately for the global and Mondrian quantiles and, where relevant, before and after projection. The per-surface values are then averaged across the evaluation period with equal weight given to each surface, rather than pooling all evaluation quotes into one summary.
 
-\textit{Sharpness:} The IV band width is $v_{\text{hi}}(x)-v_{\text{lo}}(x)$. Its mean and median are calculated over the observed quote locations of each evaluation surface after the projected grid has been mapped back to those locations. Narrower bands are preferred when coverage is comparable.
+\textit{Sharpness:} The IV band width is $v_{\text{hi}}(x)-v_{\text{lo}}(x)$. Its mean and median are calculated over the target locations of each evaluation surface after the projected grid has been mapped back to those locations. Narrower bands are preferred when coverage is comparable.
 
 \textit{Calibration diagnostics:} The global quantile and the mean, minimum, and maximum Mondrian quantiles are recorded as the rolling window advances. The number of calibration scores and the mean score per surface are also retained. These quantities show how the calibration threshold changes through time and across regions of the $(\rho,z)$ domain.
 
-\textit{Calendar and butterfly diagnostics:} The calendar and butterfly violations defined by the grid-based checks of Section~\ref{subsec:projection_algorithm} are counted before and after projection for the lower and upper band surfaces. The evaluation also records whether the projection converged and counts lower--upper crossings on the grid and at the observed quote locations.
+\textit{Calendar and discrete butterfly diagnostics:} The fixed-$k$ calendar and discrete butterfly violations defined by the grid-based checks of Section~\ref{subsec:projection_algorithm} are counted before and after projection for the lower and upper band surfaces. The evaluation also records whether the projection converged and counts lower--upper crossings on the grid and at the target locations.
 
-\textit{Point-prediction error:} The mean absolute error between the GNO prediction $\hat{v}_{t^\star}(x)$ and the market implied volatility $v_{t^\star}(x)$ is recorded as a common reference value. Because both score modes use the same trained GNO predictions, differences in their coverage and sharpness arise from the nonconformity score and band construction rather than from different point predictions.
+\textit{Point-prediction error:} The mean absolute error between the GNO prediction $\hat{v}_{t^\star}(x)$ and the held-out market implied volatility $v_{t^\star}(x)$, for $x\in\mathcal{T}_{t^\star}$, is recorded as a common reference value. Because both score modes use the same trained GNO predictions and target masks, differences in their coverage and sharpness arise from the nonconformity score and band construction rather than from different point predictions.
 
 \section{Summary}
 \label{sec:meth_summary}
 
-This chapter has presented the methodology for conformal uncertainty quantification around GNO-based implied volatility surfaces. The framework combines two economically motivated nonconformity scores, walk-forward rolling calibration, Mondrian spatial binning, prediction bands in price and implied-volatility space, and the calendar and butterfly projection of the lower and upper band surfaces. Its evaluation uses matched coverage, sharpness, calibration, projection, crossing, and point-prediction diagnostics. These components provide the methodological basis for assessing the six research objectives set out in Chapter~\ref{chap:introduction}. The following chapter describes their software implementation, and Chapter~\ref{chap:results} reports the empirical comparison of Score A and Score B on the S\&P 500 options data.
+This chapter has presented the methodology for conformal uncertainty quantification around GNO-based implied volatility surfaces. Each market surface is divided into context observations for the GNO and held-out target locations for conformal calibration and evaluation. The framework combines two economically motivated nonconformity scores, walk-forward rolling calibration, Mondrian spatial binning, prediction bands in price and implied-volatility space, and the calendar and discrete butterfly projection of the lower and upper band surfaces. Its evaluation uses matched coverage, sharpness, calibration, projection, crossing, and point-prediction diagnostics. These components provide the methodological basis for assessing the six research objectives set out in Chapter~\ref{chap:introduction}. The following chapter describes their software implementation, and Chapter~\ref{chap:results} reports the empirical comparison of Score A and Score B on the S\&P 500 options data.
