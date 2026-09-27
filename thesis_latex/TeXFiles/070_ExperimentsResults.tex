@@ -171,16 +171,17 @@ Table~\ref{tab:ablation_width} reports IV band-width summaries for both scores a
 
 \begin{table}[H]
 \centering
-\begin{tabular}{|l|c|c|}
+\small
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}X|c|c|}
 \hline
 \textbf{Metric} & \textbf{Score A (spread)} & \textbf{Score B (vega)} \\
 \hline
 Mean width before projection (IV)       & 0.060798 & 0.027111 \\
 Mean width after projection (IV)        & 0.067806 & 0.027180 \\
-Mean post-projection median width (IV)  & 0.033759 & 0.025862 \\
+Average of per-surface median widths after projection (IV) & 0.033759 & 0.025862 \\
 Mean width change from projection       & 9.88\%   & 0.26\%   \\
 \hline
-\end{tabular}
+\end{tabularx}
 \caption{Surface-weighted IV band-width summaries across the 31 evaluation surfaces.}
 \label{tab:ablation_width}
 \end{table}

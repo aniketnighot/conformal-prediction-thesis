@@ -22,7 +22,7 @@ The conformal uncertainty quantification framework is implemented as a Python pa
 \hline
 \texttt{prediction\_bands.py}     & \texttt{PredictionBands}      & Band construction in price-spread and Vega-IV modes \\
 \hline
-\texttt{no\_arbitrage\_projection.py} & \texttt{project\_band\_surfaces\_fixed\_k} & Joint fixed-$k$ calendar and discrete butterfly adjustment of both band surfaces \\
+\texttt{no\_arbitrage\_}\newline\texttt{projection.py} & \texttt{project\_band\_surfaces\_}\newline\texttt{fixed\_k} & Joint fixed-$k$ calendar and discrete butterfly adjustment of both band surfaces \\
 \hline
 \texttt{evaluation.py}            & \texttt{build\_masked\_gno\_input} & Context/target masking, GNO query construction, and surface-level bootstrap summaries \\
 \hline
@@ -92,7 +92,7 @@ During this transformation, the calendar date on which the retrieval completed w
 
 The raw directory contains 56 files. Ten files whose stored dates do not correspond to a regular Cboe trading session are excluded from the analysis: eight have weekend dates, while 25 December 2025 and 3 July 2026 are exchange holidays. The 24 December 2025 early-close file is retained. The original files are not deleted; an explicit date list filters the dataset index in memory before the GNO dataset is constructed. This leaves 46 analysis surfaces with collection dates from 11 December 2025 to 11 August 2026.
 
-The audit found no duplicate rows or duplicate contract keys within a file and no completely identical files. The 25 December file repeats the bid and ask values of the contracts also present on 26 December; excluding the non-regular-session file prevents both snapshots from entering the analysis. The retained collection dates are irregular because no successful file is available for every scheduled date. Provider API and integration errors occurred during collection, but the available logs do not identify the cause of every missing date. The CSV files also do not contain the provider quote timestamp, retrieval time, or time zone, so the stored dates are used only to order the available snapshots.
+The audit found no duplicate rows or duplicate contract keys within a file and no completely identical files. The 25 December file repeats the bid and ask values of the contracts also present on 26 December; excluding the non-regular-session file prevents both snapshots from entering the analysis. The retained collection dates are irregular because no successful file is available for every scheduled date. Provider API and integration errors occurred during collection. The CSV files also do not contain the provider quote timestamp, retrieval time, or time zone, so the stored dates are used only to order the available snapshots.
 
 \section{Context and Target Construction}
 \label{sec:impl_masking}
@@ -147,3 +147,9 @@ Figure~\ref{fig:dataset_overview} shows the 46 retained surfaces. The first 15 s
     \caption{The 46 retained SPX option surfaces after the regular-session-date filter. Blue indicates the 15 initial calibration surfaces (indices 0--14), and red indicates the 31 walk-forward evaluation surfaces (indices 15--45).}
     \label{fig:dataset_overview}
 \end{figure}
+
+\section{Summary}
+\label{sec:impl_summary}
+\thispagestyle{fancy}
+
+This chapter described the implementation of the conformal framework as a Python package and experiment notebook. It covered score calculation, rolling and Mondrian calibration, band construction and projection, data preprocessing, masking, and walk-forward evaluation. Each surface is evaluated before its scores enter the calibration window, preserving temporal order. Chapter~\ref{chap:results} reports the empirical comparison of Score A and Score B using the recorded coverage, width, projection, crossing, and prediction-error diagnostics.

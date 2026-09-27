@@ -26,7 +26,7 @@ The central problem addressed in this thesis is the construction of calibrated u
     \item Applies a post-processing routine that enforces a calendar condition and a discrete butterfly condition based on neighbouring grid points on the lower and upper band surfaces.
 \end{enumerate}
 
-Options data are heterogeneous across both time and the strike-expiry domain. Liquidity, quote density, bid-ask spreads, and price sensitivity vary between regions of the surface. The proposed framework therefore allows the band width to vary across observed points and evaluates whether spatially adaptive calibration improves coverage across the surface while retaining marginal evaluation over all observations.
+Options data are heterogeneous across both time and the strike-expiry domain. Liquidity, quote density, bid-ask spreads, and price sensitivity vary between regions of the surface. The proposed framework therefore allows the band width to vary across observed points and evaluates whether spatially adaptive calibration improves coverage across the surface while retaining marginal evaluation over the held-out target quotes.
 
 \section{Research Objectives}
 \label{sec:objectives}
@@ -36,7 +36,7 @@ This thesis pursues the following specific objectives:
 \begin{enumerate}
     \item \textbf{Design economically motivated nonconformity scores:} Develop two heteroskedastic scoring mechanisms that scale prediction errors using (a) bid-ask spreads in price space and (b) Vega-based weights in implied volatility space, so that uncertainty bands reflect trading frictions and option sensitivity.
 
-    \item \textbf{Implement rolling window calibration:} Establish a temporal adaptation mechanism using a sliding window of recent market snapshots to compute conformal quantiles, enabling the framework to track regime changes in market volatility dynamics.
+    \item \textbf{Implement rolling window calibration:} Establish a temporal adaptation mechanism using a sliding window of recent market snapshots to compute conformal quantiles, allowing the framework to respond to changes in recently observed prediction errors.
 
     \item \textbf{Evaluate spatial heterogeneity via Mondrian conformal prediction:} Investigate whether partitioning the strike-expiry domain into spatial bins and computing region-specific quantiles improves coverage uniformity across areas with varying liquidity.
 
@@ -44,7 +44,7 @@ This thesis pursues the following specific objectives:
 
     \item \textbf{Apply calendar and discrete butterfly adjustments to prediction bands:} Apply a projection algorithm to the lower and upper band surfaces and evaluate the calendar and discrete butterfly conditions on the finite $(\rho,z)$ grid used by the implementation.
 
-    \item \textbf{Validate empirical coverage:} Assess whether the conformal band surfaces achieve the nominal marginal coverage probability $(1 - \alpha)$ across observed quote locations in S\&P 500 options data spanning December 2025 to August 2026.
+    \item \textbf{Validate empirical coverage:} Assess whether the conformal band surfaces achieve the nominal marginal coverage probability $(1 - \alpha)$ across held-out target quote locations in S\&P 500 options data spanning December 2025 to August 2026.
 \end{enumerate}
 
 \section{Contributions}
@@ -53,7 +53,7 @@ This thesis pursues the following specific objectives:
 The main contributions of this thesis are:
 
 \begin{enumerate}
-    \item \textbf{First application of conformal prediction to neural operator-based volatility surfaces:} While conformal prediction has been applied to operator learning in scientific computing \cite{ma2024calibrated}, and to implied volatility forecasting without neural operators \cite{canete2023market}, to the best of our knowledge this work represents the first integration of distribution-free uncertainty quantification with operator learning architectures specifically in the context of implied volatility smoothing.
+    \item \textbf{Conformal uncertainty quantification for GNO-based volatility smoothing:} Integration of post-hoc conformal calibration with a fixed, pre-trained Graph Neural Operator to construct lower and upper uncertainty surfaces around implied volatility estimates from irregular option quotes. This work develops and evaluates the integration specifically for implied volatility smoothing, building on earlier conformal prediction research for operator learning in scientific applications \cite{ma2024calibrated}.
 
     \item \textbf{Economically aligned nonconformity scores:} Adaptation of spread-normalised price errors and Vega-weighted implied volatility errors for conformal calibration around the GNO surface. These constructions incorporate bid-ask spread information and option sensitivity when determining the band widths.
 

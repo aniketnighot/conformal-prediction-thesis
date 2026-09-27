@@ -11,9 +11,9 @@ This chapter establishes the technical foundations on which the thesis builds. W
 \subsection{European Options and the Black-Scholes Model}
 \label{subsec:bs}
 
-Following the notation of Gonon et al.\ \cite{gonon2024operator}, we consider a market of European options written on an underlying asset observed at a reference time $T_0$. Each option is identified by its expiry $T \in (T_0, \infty)$ and its strike $K \in (0, \infty)$. The time-to-expiry is denoted $\tau = T - T_0$ and the log-moneyness is defined as $k = \log(K / F_{T_0, T})$, where $F_{T_0, T}$ denotes the time-$T$ forward price of the underlying asset.
+The notation below follows Gonon et al.\ \cite{gonon2024operator}. At the observation time $T_0$, a European option has a remaining maturity $\tau = T - T_0$, with expiry $T>T_0$ and strike $K>0$. Let $F_{T_0,T}$ be the forward price at $T_0$ for delivery at $T$. Rather than using the strike directly, we express it relative to this forward price through the log-moneyness $k = \log(K / F_{T_0,T})$. The pair $(\tau,k)$ then specifies the option's location in the domain used for volatility modelling.
 
-The Black--Scholes model \cite{blackscholes1973} provides a closed-form expression for the forward-normalised price of a European call option with time-to-expiry $\tau$ and log-moneyness $k$, as a function of the volatility parameter $v \in (0, \infty)$:
+For a chosen volatility $v>0$, the Black--Scholes model \cite{blackscholes1973} maps these coordinates to a call price. Dividing the undiscounted price by $F_{T_0,T}$ gives the forward-normalised expression
 \begin{equation}
     \text{BS}(\tau, k, v) = \Phi(d_1(\tau, k, v)) - e^k \Phi(d_2(\tau, k, v)),
 \end{equation}
@@ -23,7 +23,7 @@ where $\Phi$ denotes the cumulative distribution function of the standard normal
     \qquad
     d_2(\tau,k,v) = \frac{-k}{v\sqrt{\tau}} - \frac{1}{2}v\sqrt{\tau}.
 \end{equation}
-The sensitivity of this forward-normalised option price with respect to the volatility parameter, known as Vega, plays a central role in this thesis and is given by:
+Vega measures how the option price changes as volatility changes. For the forward-normalised price above, this sensitivity is
 \begin{equation}
     \mathcal{V}(\tau, k, v) = \varphi(d_1(\tau, k, v))\sqrt{\tau},
 \end{equation}
@@ -32,25 +32,25 @@ where $\varphi$ denotes the standard normal density \cite{blackscholes1973}.
 \subsection{Implied Volatility}
 \label{subsec:iv}
 
-While the Black--Scholes model does not fully describe observed market dynamics, its mathematical tractability makes it a widely used quoting convention. Let $C(T,K)$ denote the undiscounted market price of a call option. Its implied volatility $v(\tau,k)$ is defined as the volatility value that satisfies
+The pricing formula can also be used in reverse. Given an observed call price and the remaining model inputs, implied volatility is the value of $v$ that makes the Black--Scholes price match that observation \cite{gonon2024operator}. Writing the undiscounted market price as $C(T,K)$, this means solving
 \begin{equation}
     C(T, K) = F_{T_0, T} \cdot \text{BS}(\tau, k, v(\tau, k)).
 \end{equation}
-Implied volatility therefore expresses an observed option price as a market-implied Black--Scholes volatility parameter. This provides a common quoting scale for comparing the relative expensiveness of options across strikes, maturities, underlyings, and interest-rate environments \cite{gonon2024operator}.
+This inversion places option quotes on a common volatility scale for comparison. Black--Scholes can serve this quoting role even when its assumptions do not fully describe market dynamics \cite{gonon2024operator}.
 
 \subsection{The Implied Volatility Surface}
 \label{subsec:iv_surface}
 
 At any given instant, an options market offers contracts across a range of strikes and maturities. Inverting the Black--Scholes formula \cite{blackscholes1973} for each quoted option price yields a corresponding implied volatility. The collection of these values, viewed as a function of time-to-expiry $\tau$ and log-moneyness $k$ \cite{gatheral2014ssvi}, defines the implied volatility surface. This surface provides a three-dimensional snapshot of how the market prices uncertainty across strikes and maturities.
 
-The implied volatility surface exhibits two well-documented structural features \cite{gatheral2014ssvi}. Across strikes at a fixed maturity, implied volatility typically forms a skewed smile. Across maturities, it displays a term structure that rises or falls with prevailing market conditions. These features summarise how observed option prices vary across the strike--expiry domain and make the surface an important input for derivative pricing, hedging, and portfolio risk measurement.
+The implied volatility surface exhibits two well-documented structural features \cite{gatheral2014ssvi}. Across strikes at a fixed maturity, implied volatility typically forms a skewed smile. Across maturities, it displays a term structure that rises or falls with prevailing market conditions. These features summarise how observed option prices vary across the strike-expiry domain and make the surface an important input for derivative pricing, hedging, and portfolio risk measurement.
 
 Because options trade only at a discrete and irregularly spaced set of strikes and maturities, and because this set changes as contracts expire and new ones are listed, the implied volatility surface is not directly observable as a continuous object. It must instead be reconstructed from noisy market quotes through interpolation, extrapolation, and smoothing. Constructing and quantifying the uncertainty of this reconstruction is the central problem this thesis addresses.
 
 \subsection{No-Arbitrage Conditions}
 \label{subsec:no_arbitrage}
 
-Not every smooth surface defined over the strike--expiry domain corresponds to a financially consistent option-price surface. Static no-arbitrage requirements are commonly expressed through calendar and butterfly conditions, as formalised in Theorem 2.1 of Gonon et al.\ \cite{gonon2024operator} and related to the SVI framework of Gatheral and Jacquier \cite{gatheral2014ssvi}:
+Not every smooth surface defined over the strike-expiry domain corresponds to a financially consistent option-price surface. Static no-arbitrage requirements are commonly expressed through calendar and butterfly conditions, as formalised in Theorem 2.1 of Gonon et al.\ \cite{gonon2024operator} and related to the SVI framework of Gatheral and Jacquier \cite{gatheral2014ssvi}:
 
 \begin{itemize}
     \item \textbf{No-calendar-arbitrage:} At fixed log-moneyness, total implied variance $\tau v(\tau,k)^2$ must not decrease as maturity increases. This condition corresponds to the required ordering of option prices across maturities \cite{gonon2024operator}.
@@ -98,7 +98,7 @@ giving $D = (0.01, 1) \times (-1.5, 0.5)$. These coordinates spread the data mor
 
 The architecture they adopt is the Graph Neural Operator (GNO) of Li et al.\ \cite{li2020neural}. Its graph-based kernel aggregation can process observations on irregular and changing sets of input locations. Gonon et al.\ \cite{gonon2024operator} make one structural modification by removing the pointwise linear transformation from the first GNO layer. This allows the first hidden state to be evaluated at output locations that need not coincide with the observed input locations. Together, the graph construction and this modification enable the model to map changing collections of quoted strikes and maturities to a smoothed surface without fixed-grid preprocessing.
 
-The model is trained on nine years of intraday S\&P 500 options data (2012--2020). On the held-out 2021 test year, it achieves substantially lower mean absolute percentage error than the SVI benchmark. The reported calendar and butterfly penalty terms are zero or effectively zero on average across the test set \cite{gonon2024operator}.
+The model is trained on nine years of intraday S\&P 500 options data (2012-2020). On the held-out 2021 test year, it achieves substantially lower mean absolute percentage error than the SVI benchmark. The reported calendar and butterfly penalty terms are zero or effectively zero on average across the test set \cite{gonon2024operator}.
 
 The trained model is deterministic and returns a single smoothed surface without accompanying prediction intervals. The present thesis complements this surface estimate with conformal uncertainty bands.
 
