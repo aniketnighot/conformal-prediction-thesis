@@ -8,6 +8,7 @@ import numpy as np
 from scipy.stats import norm
 from scipy.optimize import brentq
 from typing import Tuple, Optional
+from .nonconformity_scores import prediction_vega_weights
 
 
 def compute_d1_d2(z: np.ndarray,
@@ -280,13 +281,8 @@ class PredictionBands:
             Dictionary with iv_lower, iv_upper, price_lower, price_upper
         """
         if self.mode == "vega_iv":
-            vega = vega_bs(z, iv_pred, sqrt_tau, discount, forward)
-
-            # Normalize by mean vega (Equation 2 from exposé)
-            # w_V(x; v) := V(x,v) / mean(V) ∨ 1
-            mean_vega = vega.mean()
-            weights = vega / mean_vega
-            weights = np.maximum(weights, self.min_vega)
+            weights = prediction_vega_weights(
+                sqrt_tau, z, iv_pred, min_weight=self.min_vega)
 
             # Equation 6: delta_IV = q / w_V
             delta_iv = quantile / weights

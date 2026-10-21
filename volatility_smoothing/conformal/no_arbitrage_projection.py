@@ -7,6 +7,12 @@ from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack
 
 @dataclass
 class ArbitrageConstraints:
+    """Finite-grid shape diagnostics; ``butterfly`` fields retain legacy names.
+
+    Those fields count total-variance convexity violations, not violations of
+    call-price convexity in strike.
+    """
+
     butterfly_violations: int = 0
     calendar_violations: int = 0
     max_butterfly_violation: float = 0.0
@@ -25,9 +31,11 @@ def check_butterfly_arbitrage(iv_surface: np.ndarray,
                                maturities: np.ndarray,
                                epsilon: float = 1e-6) -> ArbitrageConstraints:
     """
-    Check convexity of total variance w = IV^2 * T in strike.
-    A violation at (K1, K2, K3) means w(K2) exceeds the chord from K1 to K3,
-    which permits a butterfly spread to be sold for risk-free profit.
+    Check chord convexity of total variance w = IV^2 * T on the supplied grid.
+
+    The final notebook supplies normalized moneyness z as the grid coordinate.
+    Despite this function's historical name, the check does not test call-price
+    convexity in strike and cannot establish absence of butterfly arbitrage.
     """
     n_maturities, n_strikes = iv_surface.shape
     if n_strikes < 3:
@@ -152,7 +160,7 @@ def check_calendar_arbitrage_fixed_k(iv_surface: np.ndarray,
 
 def _fixed_k_shape_constraint_matrices(z_axis: np.ndarray,
                                        rho_axis: np.ndarray):
-    """Sparse linear constraints for butterfly and fixed-k calendar shape."""
+    """Sparse linear constraints for total-variance convexity and fixed-k calendar shape."""
     n_rho, n_z = rho_axis.size, z_axis.size
     n_values = n_rho * n_z
 
@@ -201,13 +209,14 @@ def project_band_surfaces_fixed_k(iv_lower: np.ndarray,
                                   rho_axis: np.ndarray,
                                   tolerance: float = 1e-6,
                                   min_iv: float = 1e-4):
-    """Jointly adjust band surfaces under fixed-k calendar and butterfly conditions.
+    """Jointly adjust bands under fixed-k calendar and total-variance convexity conditions.
 
     The optimization uses total implied variance as its variable. It minimizes
-    the L1 change from both input surfaces subject to the discrete butterfly
-    chord conditions, the GNO paper's fixed-k calendar mapping, positivity, and
+    the L1 change from both input surfaces subject to total-variance chord
+    convexity, the GNO paper's fixed-k calendar mapping, positivity, and
     lower/upper ordering. The sparse HiGHS solver makes the result deterministic
     and avoids the cycling that can occur when the two adjustments are alternated.
+    The convexity constraint does not enforce butterfly no-arbitrage in prices.
     """
     iv_lower = np.asarray(iv_lower, dtype=float)
     iv_upper = np.asarray(iv_upper, dtype=float)
@@ -355,10 +364,11 @@ def project_to_arbitrage_free(iv_surface: np.ndarray,
                                tolerance: float = 1e-6,
                                step_size: float = 0.5) -> Tuple[np.ndarray, dict]:
     """
-    Project a volatility surface onto the nearest arbitrage-free surface.
+    Legacy shape adjustment retained under its original public function name.
 
-    Alternates between enforcing butterfly convexity (row by row) and calendar
-    monotonicity (column by column) until the surface stops changing.
+    Alternates between total-variance convexity (row by row) and calendar
+    monotonicity (column by column) until the surface stops changing. This
+    routine does not establish butterfly no-arbitrage in option prices.
     """
     initial_butterfly = check_butterfly_arbitrage(iv_surface, strikes, maturities, tolerance)
     initial_calendar = check_calendar_arbitrage(iv_surface, strikes, maturities, tolerance)
@@ -378,7 +388,7 @@ def project_to_arbitrage_free(iv_surface: np.ndarray,
     for iteration in range(max_iterations):
         iv_before = iv_current.copy()
 
-        # Enforce butterfly: convexity of w in strike, one maturity at a time
+        # Enforce total-variance convexity on the supplied grid, one maturity at a time
         for t_idx in range(n_maturities):
             T = maturities[t_idx]
             w = iv_current[t_idx, :] ** 2 * T

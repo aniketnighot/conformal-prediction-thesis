@@ -1,0 +1,576 @@
+{
+  "calibration": [
+    {
+      "index": 0,
+      "date": "2025-12-11",
+      "global_q": 0.016392,
+      "local_min": 0.012486,
+      "local_max": 0.042169
+    },
+    {
+      "index": 1,
+      "date": "2025-12-23",
+      "global_q": 0.016425,
+      "local_min": 0.01229,
+      "local_max": 0.037176
+    },
+    {
+      "index": 2,
+      "date": "2025-12-24",
+      "global_q": 0.016201,
+      "local_min": 0.012427,
+      "local_max": 0.038016
+    },
+    {
+      "index": 3,
+      "date": "2025-12-26",
+      "global_q": 0.015929,
+      "local_min": 0.012565,
+      "local_max": 0.034061
+    },
+    {
+      "index": 4,
+      "date": "2026-01-02",
+      "global_q": 0.015963,
+      "local_min": 0.012381,
+      "local_max": 0.036271
+    },
+    {
+      "index": 5,
+      "date": "2026-01-06",
+      "global_q": 0.016275,
+      "local_min": 0.012097,
+      "local_max": 0.041657
+    },
+    {
+      "index": 6,
+      "date": "2026-01-07",
+      "global_q": 0.016555,
+      "local_min": 0.012097,
+      "local_max": 0.041741
+    },
+    {
+      "index": 7,
+      "date": "2026-01-09",
+      "global_q": 0.016706,
+      "local_min": 0.011328,
+      "local_max": 0.041786
+    },
+    {
+      "index": 8,
+      "date": "2026-01-14",
+      "global_q": 0.017996,
+      "local_min": 0.011269,
+      "local_max": 0.042173
+    },
+    {
+      "index": 9,
+      "date": "2026-01-15",
+      "global_q": 0.018828,
+      "local_min": 0.011969,
+      "local_max": 0.041741
+    },
+    {
+      "index": 10,
+      "date": "2026-01-23",
+      "global_q": 0.018144,
+      "local_min": 0.012339,
+      "local_max": 0.036615
+    },
+    {
+      "index": 11,
+      "date": "2026-01-29",
+      "global_q": 0.017855,
+      "local_min": 0.012308,
+      "local_max": 0.036528
+    },
+    {
+      "index": 12,
+      "date": "2026-01-30",
+      "global_q": 0.018111,
+      "local_min": 0.012368,
+      "local_max": 0.039823
+    },
+    {
+      "index": 13,
+      "date": "2026-02-11",
+      "global_q": 0.017336,
+      "local_min": 0.012179,
+      "local_max": 0.03959
+    },
+    {
+      "index": 14,
+      "date": "2026-02-17",
+      "global_q": 0.016942,
+      "local_min": 0.011922,
+      "local_max": 0.039472
+    }
+  ],
+  "evaluation": [
+    {
+      "index": 15,
+      "date": "2026-03-03",
+      "global_pre": 84.82,
+      "mondrian_pre": 87.62,
+      "global_post": 88.12,
+      "mondrian_post": 91.42,
+      "conditions_before": 1886,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 16,
+      "date": "2026-04-10",
+      "global_pre": 91.36,
+      "mondrian_pre": 92.13,
+      "global_post": 91.17,
+      "mondrian_post": 91.6,
+      "conditions_before": 1871,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 17,
+      "date": "2026-04-16",
+      "global_pre": 91.83,
+      "mondrian_pre": 93.59,
+      "global_post": 91.2,
+      "mondrian_post": 94.36,
+      "conditions_before": 1791,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 18,
+      "date": "2026-04-17",
+      "global_pre": 89.52,
+      "mondrian_pre": 87.76,
+      "global_post": 89.39,
+      "mondrian_post": 89.34,
+      "conditions_before": 1883,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 19,
+      "date": "2026-05-08",
+      "global_pre": 94.12,
+      "mondrian_pre": 96.1,
+      "global_post": 93.72,
+      "mondrian_post": 96.5,
+      "conditions_before": 1907,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 20,
+      "date": "2026-05-13",
+      "global_pre": 88.73,
+      "mondrian_pre": 88.4,
+      "global_post": 89.61,
+      "mondrian_post": 91.24,
+      "conditions_before": 1918,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 21,
+      "date": "2026-05-14",
+      "global_pre": 91.95,
+      "mondrian_pre": 92.41,
+      "global_post": 92.73,
+      "mondrian_post": 95.58,
+      "conditions_before": 1944,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 22,
+      "date": "2026-05-15",
+      "global_pre": 91.44,
+      "mondrian_pre": 92.99,
+      "global_post": 92.17,
+      "mondrian_post": 94.45,
+      "conditions_before": 1882,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 23,
+      "date": "2026-05-18",
+      "global_pre": 91.78,
+      "mondrian_pre": 93.29,
+      "global_post": 92.65,
+      "mondrian_post": 94.58,
+      "conditions_before": 1830,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 24,
+      "date": "2026-05-19",
+      "global_pre": 89.32,
+      "mondrian_pre": 91.07,
+      "global_post": 89.59,
+      "mondrian_post": 91.81,
+      "conditions_before": 1792,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 25,
+      "date": "2026-05-20",
+      "global_pre": 90.18,
+      "mondrian_pre": 92.3,
+      "global_post": 90.87,
+      "mondrian_post": 94.47,
+      "conditions_before": 1848,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 26,
+      "date": "2026-05-21",
+      "global_pre": 89.53,
+      "mondrian_pre": 93.36,
+      "global_post": 90.5,
+      "mondrian_post": 94.93,
+      "conditions_before": 1858,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 27,
+      "date": "2026-05-22",
+      "global_pre": 92.2,
+      "mondrian_pre": 93.58,
+      "global_post": 93.39,
+      "mondrian_post": 94.81,
+      "conditions_before": 1776,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 28,
+      "date": "2026-06-04",
+      "global_pre": 89.23,
+      "mondrian_pre": 87.92,
+      "global_post": 90.11,
+      "mondrian_post": 89.32,
+      "conditions_before": 1831,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 29,
+      "date": "2026-06-05",
+      "global_pre": 88.11,
+      "mondrian_pre": 88.95,
+      "global_post": 89.69,
+      "mondrian_post": 91.36,
+      "conditions_before": 1753,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 30,
+      "date": "2026-06-16",
+      "global_pre": 89.85,
+      "mondrian_pre": 90.76,
+      "global_post": 92.02,
+      "mondrian_post": 93.51,
+      "conditions_before": 2004,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 31,
+      "date": "2026-06-23",
+      "global_pre": 89.68,
+      "mondrian_pre": 91.72,
+      "global_post": 90.41,
+      "mondrian_post": 93.41,
+      "conditions_before": 1700,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 32,
+      "date": "2026-06-24",
+      "global_pre": 88.18,
+      "mondrian_pre": 91.14,
+      "global_post": 90.05,
+      "mondrian_post": 93.6,
+      "conditions_before": 1785,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 33,
+      "date": "2026-06-26",
+      "global_pre": 89.55,
+      "mondrian_pre": 92.46,
+      "global_post": 90.23,
+      "mondrian_post": 94.02,
+      "conditions_before": 2081,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 34,
+      "date": "2026-07-02",
+      "global_pre": 89.4,
+      "mondrian_pre": 91.48,
+      "global_post": 90.72,
+      "mondrian_post": 93.14,
+      "conditions_before": 1902,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 35,
+      "date": "2026-07-07",
+      "global_pre": 87.29,
+      "mondrian_pre": 89.08,
+      "global_post": 88.01,
+      "mondrian_post": 91.25,
+      "conditions_before": 1921,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 36,
+      "date": "2026-07-08",
+      "global_pre": 87.62,
+      "mondrian_pre": 89.45,
+      "global_post": 89.26,
+      "mondrian_post": 92.24,
+      "conditions_before": 1932,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 37,
+      "date": "2026-07-15",
+      "global_pre": 92.42,
+      "mondrian_pre": 93.64,
+      "global_post": 93.64,
+      "mondrian_post": 95.45,
+      "conditions_before": 1991,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 38,
+      "date": "2026-07-17",
+      "global_pre": 92.43,
+      "mondrian_pre": 94.18,
+      "global_post": 94.57,
+      "mondrian_post": 95.88,
+      "conditions_before": 1863,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 39,
+      "date": "2026-07-30",
+      "global_pre": 89.19,
+      "mondrian_pre": 89.79,
+      "global_post": 90.14,
+      "mondrian_post": 91.04,
+      "conditions_before": 1925,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 40,
+      "date": "2026-07-31",
+      "global_pre": 91.34,
+      "mondrian_pre": 90.52,
+      "global_post": 91.59,
+      "mondrian_post": 92.02,
+      "conditions_before": 1764,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 41,
+      "date": "2026-08-04",
+      "global_pre": 88.13,
+      "mondrian_pre": 90.98,
+      "global_post": 89.19,
+      "mondrian_post": 93.01,
+      "conditions_before": 1765,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 42,
+      "date": "2026-08-05",
+      "global_pre": 86.98,
+      "mondrian_pre": 86.37,
+      "global_post": 88.98,
+      "mondrian_post": 89.03,
+      "conditions_before": 1810,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 43,
+      "date": "2026-08-06",
+      "global_pre": 89.33,
+      "mondrian_pre": 89.81,
+      "global_post": 90.47,
+      "mondrian_post": 90.96,
+      "conditions_before": 1809,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 44,
+      "date": "2026-08-07",
+      "global_pre": 90.92,
+      "mondrian_pre": 90.21,
+      "global_post": 92.42,
+      "mondrian_post": 92.02,
+      "conditions_before": 1894,
+      "conditions_after": 0,
+      "crossings": 0
+    },
+    {
+      "index": 45,
+      "date": "2026-08-11",
+      "global_pre": 88.88,
+      "mondrian_pre": 91.59,
+      "global_post": 89.52,
+      "mondrian_post": 92.42,
+      "conditions_before": 1932,
+      "conditions_after": 0,
+      "crossings": 0
+    }
+  ],
+  "summary": {
+    "Mean Coverage (Global, pre-projection)": {
+      "score_a": "89.76%",
+      "score_b": "89.85%"
+    },
+    "Mean Coverage (Mondrian, pre-projection)": {
+      "score_a": "90.19%",
+      "score_b": "91.12%"
+    },
+    "Mean Coverage (Global, post-projection)": {
+      "score_a": "85.46%",
+      "score_b": "90.84%"
+    },
+    "Mean Coverage (Mondrian, post-projection)": {
+      "score_a": "84.27%",
+      "score_b": "92.86%"
+    },
+    "Coverage 95% Surface-Bootstrap Lower": {
+      "score_a": "82.10%",
+      "score_b": "92.20%"
+    },
+    "Coverage 95% Surface-Bootstrap Upper": {
+      "score_a": "86.42%",
+      "score_b": "93.54%"
+    },
+    "Std Coverage (Mondrian, post-projection)": {
+      "score_a": "6.24%",
+      "score_b": "1.99%"
+    },
+    "Mean Band Width (Mondrian, pre-projection)": {
+      "score_a": "0.060798",
+      "score_b": "0.027118"
+    },
+    "Mean Band Width (Mondrian, post-projection)": {
+      "score_a": "0.067806",
+      "score_b": "0.027187"
+    },
+    "Mean Band Width Change from Projection": {
+      "score_a": "0.007008",
+      "score_b": "0.000069"
+    },
+    "Mean Band Width Percentage Change from Projection": {
+      "score_a": "9.878830",
+      "score_b": "0.254033"
+    },
+    "Width 95% Surface-Bootstrap Lower": {
+      "score_a": "0.061095",
+      "score_b": "0.026758"
+    },
+    "Width 95% Surface-Bootstrap Upper": {
+      "score_a": "0.074999",
+      "score_b": "0.027644"
+    },
+    "Mean of Per-Surface Median Widths (Mondrian, pre-projection)": {
+      "score_a": "0.024051",
+      "score_b": "0.025277"
+    },
+    "Mean of Per-Surface Median Widths (Mondrian, post-projection)": {
+      "score_a": "0.033759",
+      "score_b": "0.025850"
+    },
+    "Mean MAE": {
+      "score_a": "0.006813",
+      "score_b": "0.006813"
+    },
+    "Fixed-k Calendar and Butterfly Violations Before (both bounds)": {
+      "score_a": "63177",
+      "score_b": "57848"
+    },
+    "Fixed-k Calendar and Butterfly Violations After (both bounds)": {
+      "score_a": "0",
+      "score_b": "0"
+    },
+    "GNO But Diagnostics Before": {
+      "score_a": "25946",
+      "score_b": "27899"
+    },
+    "GNO But Diagnostics After": {
+      "score_a": "7432",
+      "score_b": "2730"
+    },
+    "Mondrian Projection Variance-Floor Adjustments (both bounds)": {
+      "score_a": "278",
+      "score_b": "0"
+    },
+    "Band Crossings at Quotes": {
+      "score_a": "0",
+      "score_b": "0"
+    }
+  },
+  "widths_score_b": [
+    0.0282,
+    0.03,
+    0.0301,
+    0.0293,
+    0.0296,
+    0.0283,
+    0.0278,
+    0.027,
+    0.0269,
+    0.026,
+    0.027,
+    0.0262,
+    0.0259,
+    0.0254,
+    0.0255,
+    0.0258,
+    0.0261,
+    0.0259,
+    0.0264,
+    0.026,
+    0.0265,
+    0.0267,
+    0.0274,
+    0.0267,
+    0.0267,
+    0.0269,
+    0.0271,
+    0.0267,
+    0.0277,
+    0.0286,
+    0.0284
+  ],
+  "figure_diagnostics": "Fixed-k calendar violations - before: 150, after: 0\nSaved: fig_calendar_arbitrage.png\nButterfly-condition violations - before: 846,  after: 0\nGNO But diagnostic - before: 464 after: 45\nSaved: fig_butterfly_arbitrage.png\n\nconformal_prediction.ipynb:cell20:83: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown\nconformal_prediction.ipynb:cell20:149: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown\n"
+}

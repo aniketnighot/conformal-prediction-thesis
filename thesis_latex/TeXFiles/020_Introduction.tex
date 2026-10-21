@@ -23,7 +23,7 @@ The central problem addressed in this thesis is the construction of calibrated u
     \item Accounts for heteroskedastic prediction errors through economically motivated normalisation;
     \item Responds to changing market conditions through rolling calibration windows;
     \item Produces uncertainty bands in both implied volatility and price spaces; and
-    \item Applies a post-processing routine that enforces a calendar condition and a discrete butterfly condition based on neighbouring grid points on the lower and upper band surfaces.
+    \item Applies a post-processing routine that enforces a calendar condition and a total-variance convexity condition based on neighbouring grid points on the lower and upper band surfaces.
 \end{enumerate}
 
 Options data are heterogeneous across both time and the strike-expiry domain. Liquidity, quote density, bid-ask spreads, and price sensitivity vary between regions of the surface. The proposed framework therefore allows the band width to vary across observed points and evaluates whether spatially adaptive calibration improves coverage across the surface while retaining marginal evaluation over the held-out target quotes.
@@ -42,7 +42,7 @@ This thesis pursues the following specific objectives:
 
     \item \textbf{Construct prediction bands in dual spaces:} Provide practitioners with uncertainty estimates in both implied volatility space (for volatility trading) and price space (for delta hedging and risk management).
 
-    \item \textbf{Apply calendar and discrete butterfly adjustments to prediction bands:} Apply a projection algorithm to the lower and upper band surfaces and evaluate the calendar and discrete butterfly conditions on the finite $(\rho,z)$ grid used by the implementation.
+    \item \textbf{Apply calendar and total-variance convexity adjustments to prediction bands:} Apply a projection algorithm to the lower and upper band surfaces and evaluate the calendar and total-variance convexity conditions on the finite $(\rho,z)$ grid used by the implementation.
 
     \item \textbf{Validate empirical coverage:} Assess whether the conformal band surfaces achieve the nominal marginal coverage probability $(1 - \alpha)$ across held-out target quote locations in S\&P 500 options data spanning December 2025 to August 2026.
 \end{enumerate}
@@ -59,7 +59,7 @@ The main contributions of this thesis are:
 
     \item \textbf{Temporal adaptation via rolling calibration:} Use of a rolling window of recent calibration data so that the conformal quantiles respond to changes in the observed prediction errors. Its performance on the temporally ordered surfaces is assessed empirically through the walk-forward evaluation.
 
-    \item \textbf{Grid-based projection of uncertainty bands:} Implementation of a procedure that applies the calendar and discrete butterfly adjustments used in this thesis to both the lower and upper band surfaces, together with diagnostics for residual violations and lower-upper crossings.
+    \item \textbf{Grid-based projection of uncertainty bands:} Implementation of a procedure that applies the calendar and total-variance convexity adjustments used in this thesis to both the lower and upper band surfaces, together with diagnostics for residual violations and lower-upper crossings.
 
     \item \textbf{Empirical validation on real market data:} Comprehensive evaluation on S\&P 500 options data spanning December 2025 to August 2026, providing evidence that conformal prediction can deliver empirically calibrated uncertainty surfaces in a challenging real-world financial application.
 \end{enumerate}
@@ -71,7 +71,7 @@ The remainder of this thesis is structured as follows:
 
 \textbf{Chapter 2: Background and Related Work} provides the necessary background on implied volatility surfaces, no-arbitrage constraints, traditional smoothing methods, neural operators, and the theoretical foundations of conformal prediction. We review related work on uncertainty quantification in financial machine learning and position our contribution within this literature.
 
-\textbf{Chapter 3: Methodology} presents the technical details of our conformal uncertainty quantification framework. We formally define the problem, introduce the spread-normalised and Vega-weighted nonconformity scores, describe the rolling window calibration mechanism, explain Mondrian conformal prediction for spatial heterogeneity, detail the construction of prediction bands in both price and implied volatility spaces, and present the grid-based projection procedure used to apply calendar and discrete butterfly adjustments to the resulting band surfaces.
+\textbf{Chapter 3: Methodology} presents the technical details of our conformal uncertainty quantification framework. We formally define the problem, introduce the spread-normalised and Vega-weighted nonconformity scores, describe the rolling window calibration mechanism, explain Mondrian conformal prediction for spatial heterogeneity, detail the construction of prediction bands in both price and implied volatility spaces, and present the grid-based projection procedure used to apply calendar and total-variance convexity adjustments to the resulting band surfaces.
 
 \textbf{Chapter 4: Implementation} describes the software architecture, data preprocessing pipeline, and integration with the pre-trained GNO model from Gonon et al.
 

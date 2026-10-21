@@ -2,6 +2,7 @@ from .nonconformity_scores import (
     NonconformityScore,
     SpreadNormalizedScore,
     VegaNormalizedScore,
+    prediction_vega_weights,
     compute_scores_from_data
 )
 
@@ -20,6 +21,7 @@ __all__ = [
     'NonconformityScore',
     'SpreadNormalizedScore',
     'VegaNormalizedScore',
+    'prediction_vega_weights',
     'compute_scores_from_data',
     'RollingWindowCalibration',
     'CalibrationSurface',

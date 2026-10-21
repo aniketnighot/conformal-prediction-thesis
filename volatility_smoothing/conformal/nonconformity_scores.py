@@ -10,6 +10,34 @@ import torch
 from typing import Dict, Optional
 
 
+def prediction_vega_weights(rho: np.ndarray,
+                            z: np.ndarray,
+                            iv_pred: np.ndarray,
+                            min_weight: float = 1.0) -> np.ndarray:
+    """Forward-normalized Vega weights computed only from GNO predictions.
+
+    The mean is taken over the target points of one surface. Using the same
+    function for calibration scores and prediction bands makes the bands an
+    inversion of the calibrated nonconformity score.
+    """
+    rho = np.asarray(rho, dtype=float).reshape(-1)
+    z = np.asarray(z, dtype=float).reshape(-1)
+    iv_pred = np.asarray(iv_pred, dtype=float).reshape(-1)
+    if not (rho.size == z.size == iv_pred.size) or rho.size == 0:
+        raise ValueError("rho, z and iv_pred must have the same nonzero length")
+    if not (np.all(np.isfinite(rho)) and np.all(np.isfinite(z))
+            and np.all(np.isfinite(iv_pred))):
+        raise ValueError("Vega-weight inputs must be finite")
+    if min_weight <= 0:
+        raise ValueError("min_weight must be positive")
+
+    safe_iv = np.maximum(iv_pred, 1e-8)
+    d1 = -z / safe_iv + 0.5 * safe_iv * rho
+    vega_pred = rho * np.exp(-0.5 * d1 ** 2) / np.sqrt(2 * np.pi)
+    mean_vega_pred = max(float(vega_pred.mean()), 1e-12)
+    return np.maximum(vega_pred / mean_vega_pred, min_weight)
+
+
 class NonconformityScore:
     """Base class for nonconformity scores."""
 
@@ -66,9 +94,8 @@ class VegaNormalizedScore(NonconformityScore):
     """
     Score B: Vega-weighted IV error.
 
-    Per exposé Equation (2), calibration scores evaluate Vega at the
-    observed market IV. This is distinct from Equation (6), where a new
-    prediction band's weight is evaluated at the GNO estimate.
+    Vega is evaluated at the GNO prediction for both calibration scores and
+    prediction bands. The observed market IV enters only the residual.
     """
 
     def __init__(self, min_weight: float = 1.0):
@@ -78,12 +105,10 @@ class VegaNormalizedScore(NonconformityScore):
                 iv_pred: np.ndarray,
                 iv_market: np.ndarray,
                 aux_data: Dict) -> np.ndarray:
-        # Exposé Eq. (2): w_V(x; v_t), with v_t the observed market surface.
-        vega = aux_data['vega_market']
-
-        mean_vega = vega.mean()
-        weights = vega / mean_vega
-        weights = np.maximum(weights, self.min_weight)
+        iv_pred = np.asarray(iv_pred, dtype=float).reshape(-1)
+        iv_market = np.asarray(iv_market, dtype=float).reshape(-1)
+        weights = prediction_vega_weights(
+            aux_data['rho'], aux_data['z'], iv_pred, self.min_weight)
 
         iv_residual = iv_pred - iv_market
         scores = weights * np.abs(iv_residual)
@@ -102,7 +127,6 @@ def compute_scores_from_data(
     device: torch.device,
     **score_kwargs
 ) -> np.ndarray:
-    from volatility_smoothing.utils.black_scholes import vega
     from scipy.stats import norm
 
     iv_pred = iv_predict.cpu().numpy()
@@ -162,15 +186,9 @@ def compute_scores_from_data(
         scorer = SpreadNormalizedScore(**score_kwargs)
 
     elif score_type == 'vega':
-        r_tensor = data['r'].cpu()
-        z_tensor = data['z'].cpu()
-        iv_market_tensor = data['implied_volatility'].cpu()
-
-        vega_market_tensor = vega(r_tensor, z_tensor, iv_market_tensor)
-        vega_market = vega_market_tensor.numpy()
-
         aux_data = {
-            'vega_market': vega_market
+            'rho': data['r'].cpu().numpy(),
+            'z': data['z'].cpu().numpy(),
         }
 
         scorer = VegaNormalizedScore(**score_kwargs)

@@ -58,7 +58,7 @@ Not every smooth surface defined over the strike-expiry domain corresponds to a 
     \item \textbf{No-butterfly-arbitrage:} At each fixed maturity, the corresponding call-option prices must be convex in strike. In implied-volatility terms, this is expressed through a condition involving the smile and its strike derivatives and ensures that the associated risk-neutral density remains non-negative \cite{gonon2024operator}.
 \end{itemize}
 
-These conditions provide the financial basis for the post-processing routine used in this thesis. On a regular grid, the routine applies the calendar condition and the discrete butterfly condition based on neighbouring grid points to the lower and upper band surfaces. The analytic conditions and their implementation are discussed in Chapter~\ref{chap:methodology}.
+These conditions motivate the post-processing routine used in this thesis. On a regular grid, the routine applies a fixed-$k$ calendar condition and convexity of total implied variance across neighbouring $z$ points to the lower and upper band surfaces. The latter is a shape regularisation, not the no-butterfly-arbitrage condition of convex call prices in strike. The analytic conditions and the implemented grid constraints are distinguished in Chapter~\ref{chap:methodology}.
 
 \section{Implied Volatility Smoothing}
 \label{sec:iv_smoothing}
