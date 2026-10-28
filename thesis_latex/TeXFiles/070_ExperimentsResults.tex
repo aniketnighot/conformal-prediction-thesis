@@ -167,7 +167,7 @@ The minimum bid--ask spread of 0.10 was applied to 1{,}667 of the 65{,}791 targe
 \subsection{Band Width}
 \label{subsec:ablation_width}
 
-Table~\ref{tab:ablation_width} reports IV band-width summaries for both scores across the 31 evaluation surfaces. Each entry gives equal weight to each surface. The post-projection median row is the mean of the 31 within-surface median widths.
+Table~\ref{tab:ablation_width} reports IV band-width summaries for both scores across the 31 evaluation surfaces. Each entry gives equal weight to each surface. The pre- and post-projection median rows give the means of the 31 within-surface median widths at the corresponding stage.
 
 \begin{table}[H]
 \centering
@@ -178,6 +178,7 @@ Table~\ref{tab:ablation_width} reports IV band-width summaries for both scores a
 \hline
 Mean width before projection (IV)       & 0.060798 & 0.027118 \\
 Mean width after projection (IV)        & 0.067806 & 0.027187 \\
+Average of per-surface median widths before projection (IV) & 0.024051 & 0.025277 \\
 Average of per-surface median widths after projection (IV) & 0.033759 & 0.025850 \\
 Mean of per-surface percentage width changes & 9.88\%   & 0.254\%   \\
 \hline
